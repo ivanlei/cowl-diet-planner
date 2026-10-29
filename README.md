@@ -172,21 +172,21 @@ the same ones.
 
 ## The Shopping tab
 
-The plan on screen, or the locked one, times a number of days (31 to start), less what you already
-have in your inventory, closet, Hagnk's and display case. For each thing: how many a day, for the
-days, what you have and where, and how many more to get. Something you'd cook or mix rather than buy
-(the Before Yore casserole) comes apart into what goes in it, for as many as you're short. It shows
-how many the mall has today where the plan's check asked, flags anything there isn't enough of, and
-gives a rough bill at KoLmafia's recorded prices. The Feast of Boris day eats more: shop for it on its
-own.
-
-**Storage shelf** keeps what you've bought out of the way of anything that tidies your inventory:
+At the top, **Storage shelf** keeps what you've bought out of the way of anything that tidies your inventory:
 choose a shelf in your display case, by name, and **Move the diet's things to this shelf** puts every
 one you have of the list's things in the case on it, after asking. That's whatever is in your
 inventory, your closet and Hagnk's (Hagnk's only when taking from it is free), along with any already
 in the case on another shelf. Worn items stay worn, and anything a display case won't take stays where
 it is. The shelf is kept by its name, so adding or removing other shelves doesn't send things to the
 wrong one.
+
+Below it, the list: the plan on screen, or the locked one, times a number of days (31 to start), less what you already
+have in your inventory, closet, Hagnk's and display case. For each thing: how many a day, for the
+days, what you have and where, and how many more to get. Something you'd cook or mix rather than buy
+(the Before Yore casserole) comes apart into what goes in it, for as many as you're short. It shows
+how many the mall has today where the plan's check asked, flags anything there isn't enough of, and
+gives a rough bill at KoLmafia's recorded prices. The Feast of Boris day eats more: shop for it on its
+own.
 
 ## What it counts
 
