@@ -9,7 +9,7 @@
 // The plan is drawn as a table in the order to do things. Each name is a link to the wiki, and an
 // item's picture opens KoL's description of it, from cowl_diet_items.ash, asked once per name.
 //
-// Whatever plan is on screen is checked against the mall by itself (cowl_diet_price.ash): how many
+// Nothing is planned until Plan is pressed. Then the plan is checked against the mall (cowl_diet_price.ash): how many
 // of each thing it takes are for sale today and at what prices. It pays for the units it takes,
 // cheapest first, can't take more than there are, and drops what nobody sells; then it plans again
 // and checks what the new plan picked, until every item in it is one the mall has. A price in
@@ -25,10 +25,11 @@
 // (cowlDietLocked, through cowl_diet_save.ash). Until it's unlocked the page shows that plan exactly
 // as it was, every time it's opened, and plans and prices nothing.
 //
-// Three tabs: the diet; rollover (cowl_diet_rollover.js), which counts what you'll wear and have at
-// rollover -- its total and what you leave unplayed are what a nightcap has to fit under the 200 cap
-// with, and the plan tells it back which nightcap it chose; and shopping, which multiplies the plan
-// by a number of days and takes off what you already have (cowl_diet_shop.ash).
+// Three tabs: rollover (cowl_diet_rollover.js), which counts what you'll wear and have at rollover
+// -- its total and what you leave unplayed are what a nightcap has to fit under the 200 cap with,
+// and the plan tells it back which nightcap it chose; the diet; and shopping, which multiplies the
+// plan by a number of days and takes off what you already have (cowl_diet_shop.ash). Changing a
+// switch or the rollover tab dims the plan until Plan is pressed again.
 //
 // The switches start from what KoLmafia says the character has, and are remembered in this
 // browser. Nothing here buys or eats.
@@ -44,6 +45,7 @@
 	var refresh = document.getElementById('cd-refresh');
 	var priceSaid = document.getElementById('cd-price-said');
 	var lockBtn = document.getElementById('cd-lock');
+	var planBtn = document.getElementById('cd-plan');
 	var lockSaid = document.getElementById('cd-lock-said');
 	var rollEl = document.getElementById('cd-rollover');
 	var shopEl = document.getElementById('cd-shop');
@@ -53,13 +55,14 @@
 	var MARKET_STORE = 'cowlDietMarket', MARKET_HOURS = 3;
 	var PRESETS = [25000, 55000, 100000, 250000, 500000, 1000000];
 	var CURVE = [10000, 25000, 55000, 100000, 250000, 500000, 1000000, 2000000];
-	var TABS = ['diet', 'rollover', 'shopping'];
+	var TABS = ['rollover', 'diet', 'shopping'];
 	var WIKI = 'https://wiki.kingdomofloathing.com/index.php?go=Go&search=';
 	var ORGANS = ['fullness', 'drunk', 'spleen'];
 
 	var data = null, frontier = null, cfg = null, choices = {}, budget = 55000, run = 0;
 	var market = {}, pricedAt = {}, facts = {}, asked = {};  // the mall's answers; how many each was priced for
-	var checking = false, recheck = false, checkTimer = null;
+	var busy = false;    // planning or checking, after Plan
+	var dirty = true;    // the switches or rollover have changed since the plan on screen
 	var DONE = 'Every item in this plan is for sale today, priced for the quantity it takes.';
 	var rollSum = null, rollApi = null;  // the rollover section's count, once it's drawn
 	var tab = 'diet';
@@ -143,7 +146,10 @@
 		refresh.disabled = on;
 		Array.prototype.forEach.call(presets.querySelectorAll('button'), function (b) { b.disabled = on; });
 		Array.prototype.forEach.call(switchBar.querySelectorAll('input'), function (b) { b.disabled = on; });
-		lockBtn.textContent = on ? 'Unlock and plan again' : 'Save this plan';
+		planBtn.disabled = on || busy;
+		planBtn.textContent = busy ? 'Planning...' : 'Plan';
+		lockBtn.disabled = busy || (!on && !frontier);
+		lockBtn.textContent = on ? 'Unlock' : 'Save this plan';
 		lockBtn.className = 'cd-refresh' + (on ? ' cd-locked' : '');
 		lockSaid.textContent = on ? 'Saved ' + new Date(locked.at).toLocaleString() + ': this page shows this plan, as it was,' +
 			' every time it’s opened, and plans and prices nothing until you unlock it.' : '';
@@ -163,6 +169,7 @@
 	function planNow(why) {
 		var mine = ++run;
 		frontier = null;
+		dirty = false;
 		root.className = 'cd-stale';
 		cfg = P.buildConfig(data, planChoices());
 		why = why || 'Planning';
@@ -173,7 +180,7 @@
 		}).then(function (fr) {
 			if (mine !== run) return false;
 			frontier = fr;
-			root.className = '';
+			root.className = dirty ? 'cd-stale' : '';
 			status.textContent = '';
 			status.title = 'planned in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
 			draw();
@@ -369,6 +376,12 @@
 		root.innerHTML = html.join('');
 		fetchFacts(v.rows.map(function (r) { return r.name; }));
 		if (tab === 'shopping') shopSoon();
+		// a budget picked after the last Plan may name things the mall hasn't been asked about
+		if (!locked && !busy) {
+			var unchecked = Object.keys(v.items).filter(function (n) { return !market[n]; }).length;
+			priceSaid.textContent = !unchecked ? DONE : unchecked + (unchecked === 1 ? ' thing in this plan hasn’t'
+				: ' things in this plan haven’t') + ' been checked against the mall: press Plan to check.';
+		}
 	}
 
 	function showTab(name) {
@@ -449,25 +462,28 @@
 		});
 	}
 
-	// The plan on screen is checked whenever it changes, one check at a time; never a saved one.
-	function autoCheck() {
-		if (locked) return;
-		if (checking) { recheck = true; return; }
-		checking = true;
-		checkPrices(1).catch(function (e) {
+	// Plan: plans again if anything has changed since the plan on screen, and checks it against the
+	// mall either way. Nothing else plans.
+	function planPressed() {
+		if (locked || busy) return;
+		busy = true;
+		lockControls();
+		priceSaid.textContent = '';
+		(frontier && !dirty ? Promise.resolve(true) : planNow()).then(function (done) {
+			if (done) return checkPrices(1);
+		}).catch(function (e) {
 			priceSaid.textContent = (e && e.message) || 'The mall didn’t answer.';
 		}).then(function () {
-			checking = false;
-			if (recheck) { recheck = false; autoCheck(); }
+			busy = false;
+			lockControls();
 		});
 	}
-	function checkSoon() {
-		clearTimeout(checkTimer);
-		checkTimer = setTimeout(autoCheck, 1200);
-	}
-	function planAndCheck() {
-		if (locked) return Promise.resolve();
-		return planNow().then(function (done) { if (done) autoCheck(); });
+
+	// Something the plan depends on changed: the plan on screen dims until Plan is pressed.
+	function stale(what) {
+		dirty = true;
+		if (root.innerHTML) root.className = 'cd-stale';
+		if (!busy) status.textContent = what + ': press Plan to plan again.';
 	}
 
 	// The button: KoLmafia's prices for whole categories, the data again, and a plan on them, which
@@ -486,8 +502,8 @@
 			market = {};
 			pricedAt = {};
 			saveMarket();
-			priceSaid.textContent = gone ? gone + ' things KoLmafia had prices for aren’t for sale.' : '';
-			return planAndCheck();
+			priceSaid.textContent = 'KoLmafia has fresh prices' + (gone ? '; ' + gone + ' things it had prices for aren’t for sale' : '') + '.';
+			stale('Prices refreshed');
 		}).catch(function (e) {
 			priceSaid.textContent = (e && e.message) || 'The mall didn’t answer.';
 		}).then(function () {
@@ -515,16 +531,15 @@
 				priceSaid.textContent = '';
 				draw();
 			} else if (frontier) {
+				dirty = true;
 				draw();
-				autoCheck();
+				stale('Unlocked');
 			} else {
-				planAndCheck();
+				stale('Unlocked');
 			}
 		}).catch(function (e) {
 			lockSaid.textContent = (e && e.message) || 'KoLmafia didn’t keep it.';
-		}).then(function () {
-			lockBtn.disabled = false;
-		});
+		}).then(lockControls);
 	}
 
 	// --- Shopping ----------------------------------------------------------------------
@@ -641,7 +656,6 @@
 		budget = b;
 		save();
 		draw();
-		checkSoon();
 	});
 	presets.addEventListener('click', function (e) {
 		var b = e.target.getAttribute('data-b');
@@ -650,14 +664,13 @@
 		budgetBox.value = budget;
 		save();
 		draw();
-		checkSoon();
 	});
 	switchBar.addEventListener('change', function (e) {
 		var k = e.target.getAttribute('data-k');
 		if (!k || locked) return;
 		choices[k] = e.target.checked;
 		save();
-		planAndCheck();
+		stale('A switch changed');
 	});
 	refresh.addEventListener('click', updatePrices);
 	// An item's picture, anywhere on the page: KoL's description of it, in a small window of its own.
@@ -668,6 +681,7 @@
 			'width=380,height=440,resizable=yes,scrollbars=yes');
 	});
 	lockBtn.addEventListener('click', toggleLock);
+	planBtn.addEventListener('click', planPressed);
 	tabBar.addEventListener('click', function (e) {
 		var b = e.target.closest && e.target.closest('[data-tab]');
 		if (!b) return;
@@ -682,7 +696,6 @@
 			budgetBox.value = budget;
 			save();
 			draw();
-			checkSoon();
 		}
 	});
 
@@ -713,7 +726,7 @@
 			rollApi = window.cowlDietRollover.mount(rollEl, roll, function (sum) {
 				var before = rollSum.total + rollSum.unplayed;
 				rollSum = sum;
-				if (sum.total + sum.unplayed !== before) planAndCheck(); else draw();
+				if (sum.total + sum.unplayed !== before) stale('The Rollover tab changed'); else draw();
 			});
 			rollSum = rollApi.summary;
 		} else if (rollEl) {
@@ -726,7 +739,8 @@
 			draw();
 			return;
 		}
-		priceSaid.textContent = 'Planning, then checking the plan against the mall...';
-		planAndCheck();
+		root.innerHTML = '<p class="cd-said cd-wait">Set the budget, the switches and the Rollover tab, then press' +
+			' <b>Plan</b>.</p>';
+		status.textContent = '';
 	}).catch(function () { status.textContent = 'KoLmafia didn’t answer. Reload the page.'; });
 })();

@@ -122,6 +122,19 @@ bare.gear = {};
 bare.gibberer = bare.circadian = false;
 assert.strictEqual(R.summary(cat, bare).total, cat.today.total);
 assert.strictEqual(R.summary(cat, bare).clicks, 3 + 5 + 1, 'a calendar, the self-help books and the desk calendar');
+// What a gear box offers: what you own, best first; then only what you don't own that beats it.
+const backs = R.choices(cat, 'back', '', mine.wear);
+assert.strictEqual(backs.owned[0].name, 'Elf Guard fuel tank');
+assert.ok(backs.rest.length && backs.rest.every(g => g.owned <= 0 && g.adv > backs.owned[0].adv), 'only better ones you lack');
+const hats = R.choices(cat, 'hat', '', mine.wear);
+assert.strictEqual(hats.mine.name, 'time cop top hat');
+assert.strictEqual(hats.rest.length, 0, 'nothing beats a +5 hat');
+const acc3 = R.choices(cat, 'acc3', '', mine.wear);
+assert.strictEqual(acc3.mine.name, mine.wear.acc3, "an accessory box measures against the best you'd wear in it");
+assert.ok(acc3.rest.every(g => g.adv > acc3.mine.adv) && acc3.rest.some(g => g.name === 'Counterclockwise Watch'));
+assert.ok(acc3.owned.every((g, i) => !i || acc3.owned[i - 1].adv >= g.adv), 'best first');
+assert.deepStrictEqual(R.choices(cat, 'familiar', '', mine.wear).owned.map(f => f.name), ['Disembodied Hand']);
+
 // the etched hourglass: 5 more in the day, none at rollover, and only for someone who has one
 assert.strictEqual(R.summary(cat, bare).hourglass, 0);
 const glass = Object.assign({}, cat, {today: Object.assign({}, cat.today, {hourglass: true})});
