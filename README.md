@@ -7,11 +7,14 @@ else: nothing on it buys, eats or moves anything.
 
 It has three tabs:
 
-- **Diet** — the plan for a budget, checked against the mall so that everything in it is for sale
-  today, in the quantity it takes, priced for that quantity.
 - **Rollover** — the gear, campground and clan furniture that add adventures each night, the best
   there is beside what you have, and tonight's bank against the 200 cap, which sizes the nightcap.
+- **Diet** — the plan for a budget, checked against the mall so that everything in it is for sale
+  today, in the quantity it takes, priced for that quantity.
 - **Shopping** — the plan times a number of days, less what you already have.
+
+Set up the Rollover tab and the Diet tab's budget and switches, then press **Plan**: nothing is
+planned until you do.
 
 ## Install
 
@@ -40,7 +43,7 @@ category, `historical_age` and `git_info`, among others.
 
 ## The Diet tab
 
-Type a budget, or pick one of the buttons, and the page shows:
+Type a budget, or pick one of the buttons, and press **Plan**. The page shows:
 
 - **the adventures** that much meat buys from consumption and organ-free extras;
 - **a day's turns**: rollover, the plan, the Rumpus Room's clicks, the potato alarm clock and the etched
@@ -65,8 +68,11 @@ The table's columns:
 | Meat per fullness | what it costs over that space |
 | Cost | what that row costs to buy |
 
-Changing the budget re-plans at once; changing a switch plans again from scratch, which takes about
-12 seconds. The switches start from what KoLmafia says you have, and the page remembers your changes:
+Plan takes about 12 seconds, then checks the plan against the mall. After that, changing the budget
+picks that budget's plan at once, and says if anything in it hasn't been checked yet; press Plan to
+check it. Changing a switch, or anything on the Rollover tab, dims the plan until you press Plan
+again. Plan is off while a plan is saved. The switches start from what KoLmafia says you have, and
+the page remembers your changes:
 
 | Switch | What it changes |
 |---|---|
@@ -82,16 +88,15 @@ Changing the budget re-plans at once; changing a switch plans again from scratch
 ### Save this plan
 
 **Save this plan** keeps the plan on screen and everything behind it in a KoLmafia preference. Until
-you press **Unlock and plan again**, the page shows exactly that plan every time it's opened, in any
-browser, and plans and prices nothing; the budget, the switches, the prices button and the Rollover
-tab's boxes are frozen. Unlocking plans again from the saved choices.
+you press **Unlock**, the page shows exactly that plan every time it's opened, in any browser, and
+plans and prices nothing; Plan, the budget, the switches, the prices button and the Rollover tab's
+boxes are frozen. After unlocking, press Plan to plan again from the saved choices.
 
 ### Prices, and what's for sale
 
-The page plans first on KoLmafia's recorded mall prices, which can be days old and can't say how many
-are for sale. So **the plan on screen is checked against the mall by itself** whenever it changes:
-for each thing the plan picked, how many are for sale at each price, counting each store's daily
-limit. Then:
+Plan starts from KoLmafia's recorded mall prices, which can be days old and can't say how many are
+for sale. So **every plan is checked against the mall**: for each thing it picked, how many are for
+sale at each price, counting each store's daily limit. Then:
 
 - the plan pays for the units it takes, cheapest first, and for five at least, as KoLmafia's own
   `mall_price()` does: nine of something with 2 for sale at 3,999 and 7 at 5,500 cost what those cost;
@@ -109,7 +114,7 @@ today's stock: sellers restock, but a thin market can run out over a month.
 
 **Update prices from the mall** refreshes KoLmafia's prices for every food, booze and other
 consumable at once (`mall_prices()`, about 1,750 prices); for a day after, anything it didn't price
-wasn't for sale and drops out before planning.
+wasn't for sale and drops out. Press Plan afterwards to plan on them.
 
 ### The Cup of 13s
 
@@ -137,8 +142,12 @@ Below that:
 
 - **Gear**, one row per slot: head, back, shirt, weapon, off-hand, pants, three accessories, the
   familiar and its equipment. Beside each box is **the best there is** for that slot, ★ where you
-  own one, otherwise "in the mall" or "not tradeable". The boxes start from **the best you own** and
-  suggest the slot's gear as you type; put in what you'll actually wear.
+  own one, otherwise "in the mall" or "not tradeable". Put in what you'll actually wear: a box's menu
+  lists the gear you own for that slot, best first, then after a line the gear you don't own that
+  would beat it (for an accessory, beat the one your best gear puts in that box), and nothing that
+  wouldn't. Typing narrows both; the arrow keys and Enter pick. The boxes start from **the best you
+  own**, and an empty box shows it. The familiar's box lists your familiars, the ones that can wear
+  rollover gear first.
 - What you type is counted the way the game counts it: one watch, a single-equip item once, nothing
   in the off-hand beside a two-handed weapon (a second one-handed weapon only with Double-Fisted Skull
   Smashing), familiar equipment only on its familiar, a one-handed weapon on a Disembodied Hand and an

@@ -6,8 +6,9 @@
 // clan's Rumpus Room, and what you chose last time.
 //
 // For every slot it suggests the best there is, ★ where you own it, and a box for what you'll
-// actually wear, with the slot's gear to pick from as you type. The boxes start from the best you
-// own. What you type is counted the way the game counts it: one watch, single-equip items once, no
+// actually wear. A box's menu lists what you own for the slot, best first, then after a line what
+// you don't own that would beat it; typing narrows both. The boxes start from the best you own, and
+// an empty one shows it. What you type is counted the way the game counts it: one watch, single-equip items once, no
 // off-hand beside a two-handed weapon, a Disembodied Hand holding a one-handed weapon and a Left-Hand
 // Man an off-hand, an outfit's bonus once every piece is on. The campground is the same: the best
 // suggested, and boxes for what you have, ticked from what KoLmafia sees.
@@ -236,7 +237,49 @@
 			unplayed: Math.max(0, Math.min(200, Math.round(s.unplayed) || 0))};
 	}
 
+	// The gear that can go in one box: a slot's own kind, a second one-handed weapon in the off-hand
+	// with Double-Fisted Skull Smashing, and in the familiar's box whatever that familiar can hold.
+	function eligible(cat, slot, familiar) {
+		if (slot === 'famequip' && key(familiar) === key(HAND)) {
+			return cat.gear.filter(function (g) { return g.slot === 'weapon' && g.hands === 1; });
+		}
+		if (slot === 'famequip' && key(familiar) === key(LEFT)) {
+			return cat.gear.filter(function (g) { return g.slot === 'offhand'; });
+		}
+		if (slot === 'famequip') {
+			return cat.gear.filter(function (g) { return g.slot === 'familiar' && (!g['for'] || key(g['for']) === key(familiar)); });
+		}
+		var kind = SLOTS.filter(function (s) { return s[0] === slot; })[0][2];
+		return cat.gear.filter(function (g) {
+			return g.slot === kind || (slot === 'offhand' && cat.dualWield && g.slot === 'weapon' && g.hands === 1);
+		});
+	}
+
+	// What a box offers: what you own, best first; then, after a line, what you don't own that beats
+	// what you'd wear there anyway -- for an accessory, the one the best you own puts in that box --
+	// and nothing that doesn't. A familiar's box offers the familiars you have, the ones that can wear
+	// rollover gear first. {owned, rest, restLabel, mine}, mine being the best you own for the box.
+	function choices(cat, slot, familiar, mineWear) {
+		if (slot === 'familiar') {
+			var holds = {};
+			holds[HAND] = holds[LEFT] = 1;
+			cat.gear.forEach(function (g) { if (g.slot === 'familiar' && g['for']) holds[g['for']] = 1; });
+			var have = cat.familiars.slice().sort();
+			var useful = have.filter(function (f) { return holds[f]; });
+			return {owned: useful.map(function (f) { return {name: f}; }),
+				rest: have.filter(function (f) { return !holds[f]; }).map(function (f) { return {name: f}; }),
+				restLabel: 'your other familiars', mine: useful.length ? {name: useful[0]} : null};
+		}
+		var list = eligible(cat, slot, familiar).sort(rank);
+		var owned = list.filter(function (g) { return g.owned > 0; });
+		var mine = /^acc/.test(slot) ? index(cat)[key((mineWear || {})[slot])] || null : owned[0] || null;
+		var bar = mine ? mine.adv : 0;
+		return {owned: owned, rest: list.filter(function (g) { return g.owned <= 0 && g.adv > bar; }),
+			restLabel: 'not yours, and better than what you have', mine: mine};
+	}
+
 	exports.SLOTS = SLOTS;
+	exports.choices = choices;
 	exports.best = best;
 	exports.tally = tally;
 	exports.initial = initial;
@@ -266,30 +309,6 @@
 			'<div class="cd-sub">' + esc(sub) + '</div></td>';
 	}
 
-	// The gear to pick from as you type in a slot's box, best first.
-	function options(cat, slot, familiar) {
-		var list;
-		if (slot === 'familiar') {
-			return cat.familiars.slice().sort().map(function (f) { return '<option value="' + esc(f) + '">'; }).join('');
-		}
-		if (slot === 'famequip' && key(familiar) === key(HAND)) {
-			list = cat.gear.filter(function (g) { return g.slot === 'weapon' && g.hands === 1; });
-		} else if (slot === 'famequip' && key(familiar) === key(LEFT)) {
-			list = cat.gear.filter(function (g) { return g.slot === 'offhand'; });
-		} else if (slot === 'famequip') {
-			list = cat.gear.filter(function (g) { return g.slot === 'familiar' && (!g['for'] || key(g['for']) === key(familiar)); });
-		} else {
-			var kind = SLOTS.filter(function (s) { return s[0] === slot; })[0][2];
-			list = cat.gear.filter(function (g) {
-				return g.slot === kind || (slot === 'offhand' && cat.dualWield && g.slot === 'weapon' && g.hands === 1);
-			});
-		}
-		return list.sort(rank).map(function (g) {
-			return '<option value="' + esc(g.name) + '" label="+' + g.adv + (g.owned > 0 ? ' · you have ' + g.owned : '') +
-				(g.note ? ' · ' + esc(g.note) : '') + '">';
-		}).join('');
-	}
-
 	function meat(n) { return Math.round(n).toLocaleString(); }
 
 	// Draws the section into el and keeps it counted; onChange(summary) after each change settles.
@@ -307,6 +326,66 @@
 			var sub = g ? had(g) + (g.note ? ' · ' + g.note : '') +
 				(id === 'famequip' && top.wear.familiar ? ' · on the ' + top.wear.familiar : '') : '';
 			return itemCells(g, sub) + '<td class="cd-num">' + (g ? plus(g.adv) : '') + '</td>';
+		}
+
+		// What an empty box shows: the best you own for it.
+		function hint(slot) {
+			var c = choices(cat, slot, state.gear.familiar, mine.wear);
+			if (slot === 'familiar') return mine.wear.familiar ? 'your best: ' + mine.wear.familiar : 'a familiar you have';
+			return c.mine ? 'your best: ' + c.mine.name + ' (+' + c.mine.adv + ')' : 'nothing you own adds here';
+		}
+
+		// --- The gear boxes' menus: yours, a line, then better ones you don't have ---
+		var activeOpt = -1;
+		function menuOf(input) { return input.parentNode.querySelector('.cd-menu'); }
+		function optHtml(x, owned) {
+			var right = x.adv === undefined ? '' : (owned ? '' : x.tradeable ? 'in the mall · ' : 'not tradeable · ') + '+' + x.adv;
+			return '<div class="cd-opt" role="option" data-name="' + esc(x.name) + '"><span>' + esc(x.name) +
+				(x.note ? ' <span class="cd-said">' + esc(x.note) + '</span>' : '') + '</span><span class="cd-said">' + right +
+				'</span></div>';
+		}
+		function openMenu(input) {
+			var slot = input.getAttribute('data-slot'), c = choices(cat, slot, state.gear.familiar, mine.wear);
+			var q = key(input.value), all = c.owned.concat(c.rest);
+			// a box that already holds one of them still offers them all, so it can be changed
+			var exact = all.some(function (x) { return key(x.name) === q; });
+			var keep = function (x) { return !q || exact || key(x.name).indexOf(q) >= 0; };
+			var a = c.owned.filter(keep), b = c.rest.filter(keep), h = [];
+			a.forEach(function (x) { h.push(optHtml(x, true)); });
+			if (!a.length && !q) h.push('<div class="cd-none">nothing you own goes here</div>');
+			if (b.length) {
+				h.push('<div class="cd-sep" role="separator">' + esc(c.restLabel) + '</div>');
+				b.forEach(function (x) { h.push(optHtml(x, false)); });
+			}
+			if (!h.length) h.push('<div class="cd-none">nothing by that name adds adventures here</div>');
+			var menu = menuOf(input);
+			menu.innerHTML = h.join('');
+			menu.hidden = false;
+			input.setAttribute('aria-expanded', 'true');
+			activeOpt = -1;
+		}
+		function closeMenus() {
+			Array.prototype.forEach.call(el.querySelectorAll('.cd-menu'), function (m) { m.hidden = true; });
+			Array.prototype.forEach.call(el.querySelectorAll('input[data-slot]'), function (i) {
+				i.setAttribute('aria-expanded', 'false');
+			});
+			activeOpt = -1;
+		}
+		function moveActive(input, by) {
+			var opts = menuOf(input).querySelectorAll('.cd-opt');
+			if (!opts.length) return;
+			if (activeOpt >= 0 && opts[activeOpt]) opts[activeOpt].className = 'cd-opt';
+			activeOpt = (activeOpt + by + opts.length) % opts.length;
+			opts[activeOpt].className = 'cd-opt cd-active';
+			opts[activeOpt].scrollIntoView({block: 'nearest'});
+		}
+		function choose(input, name) {
+			var slot = input.getAttribute('data-slot');
+			input.value = name;
+			state.gear[slot] = name;
+			closeMenus();
+			if (slot === 'familiar') el.querySelector('input[data-slot="famequip"]').placeholder = hint('famequip');
+			count();
 		}
 
 		function draw() {
@@ -329,10 +408,11 @@
 			h.push('<table class="cd-order cd-roll"><thead><tr><th>Slot</th><th>What you’ll wear</th><th>Adv</th>' +
 				'<th colspan="2">Best there is</th><th>Adv</th></tr></thead><tbody>');
 			SLOTS.forEach(function (s) {
-				h.push('<tr><td class="cd-act">' + s[1] + '</td><td class="cd-wear"><input type="text" list="cd-dl-' + s[0] +
-					'" data-slot="' + s[0] + '" value="' + esc(state.gear[s[0]] || '') + '" autocomplete="off" spellcheck="false">' +
-					'<datalist id="cd-dl-' + s[0] + '">' + options(cat, s[0], state.gear.familiar) + '</datalist>' +
-					'<div class="cd-sub" data-why="' + s[0] + '"></div></td><td class="cd-num" data-adv="' + s[0] + '"></td>' +
+				h.push('<tr><td class="cd-act">' + s[1] + '</td><td class="cd-wear"><div class="cd-combo"><input type="text"' +
+					' data-slot="' + s[0] + '" value="' + esc(state.gear[s[0]] || '') + '" placeholder="' + esc(hint(s[0])) + '"' +
+					' autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false"' +
+					' aria-controls="cd-menu-' + s[0] + '"><div class="cd-menu" id="cd-menu-' + s[0] + '" role="listbox" hidden></div>' +
+					'</div><div class="cd-sub" data-why="' + s[0] + '"></div></td><td class="cd-num" data-adv="' + s[0] + '"></td>' +
 					bestRow(s[0]) + '</tr>');
 			});
 			h.push('</tbody><tfoot><tr><td>Gear</td><td data-outfit></td><td class="cd-num" data-gear></td><td colspan="2">' +
@@ -441,9 +521,9 @@
 			set('r', sum.total);
 			set('u', sum.unplayed);
 			if (!night) {
-				set('cap', '<span class="cd-said">waiting for the diet plan</span>');
+				set('cap', '<span class="cd-said">press Plan on the Diet tab for a nightcap</span>');
 			} else if (night.room !== undefined && night.room !== room) {
-				set('cap', '<span class="cd-said">the diet plan is choosing a nightcap for the ' + room + ' left...</span>');
+				set('cap', '<span class="cd-said">press Plan on the Diet tab to fit a nightcap to the ' + room + ' left</span>');
 				cap = null;
 				n = 0;
 			} else if (!night.on) {
@@ -490,8 +570,34 @@
 			var slot = e.target.getAttribute('data-slot');
 			if (!slot) return;
 			state.gear[slot] = e.target.value.trim();
-			if (slot === 'familiar') document.getElementById('cd-dl-famequip').innerHTML = options(cat, 'famequip', state.gear.familiar);
+			if (slot === 'familiar') el.querySelector('input[data-slot="famequip"]').placeholder = hint('famequip');
+			openMenu(e.target);
 			count();
+		});
+		el.addEventListener('focusin', function (e) {
+			if (e.target.getAttribute && e.target.getAttribute('data-slot')) openMenu(e.target);
+		});
+		el.addEventListener('focusout', function (e) {
+			if (e.target.getAttribute && e.target.getAttribute('data-slot')) closeMenus();
+		});
+		el.addEventListener('keydown', function (e) {
+			var input = e.target;
+			if (!input.getAttribute || !input.getAttribute('data-slot')) return;
+			var menu = menuOf(input);
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				if (menu.hidden) openMenu(input);
+				moveActive(input, e.key === 'ArrowDown' ? 1 : -1);
+				e.preventDefault();
+			} else if (e.key === 'Enter' && !menu.hidden && activeOpt >= 0) {
+				choose(input, menu.querySelectorAll('.cd-opt')[activeOpt].getAttribute('data-name'));
+				e.preventDefault();
+			} else if (e.key === 'Escape') {
+				closeMenus();
+			}
+		});
+		// a press on the menu keeps the box focused, so the click that follows can choose
+		el.addEventListener('mousedown', function (e) {
+			if (e.target.closest && e.target.closest('.cd-menu')) e.preventDefault();
 		});
 		el.addEventListener('change', function (e) {
 			var t = e.target, m = t.getAttribute('data-maid'), c = t.getAttribute('data-camp');
@@ -504,6 +610,17 @@
 			count();
 		});
 		el.addEventListener('click', function (e) {
+			var opt = e.target.closest && e.target.closest('.cd-opt');
+			if (opt) {
+				choose(opt.closest('.cd-combo').querySelector('input'), opt.getAttribute('data-name'));
+				return;
+			}
+			// a box that already has the focus opens its menu again when pressed
+			if (e.target.getAttribute && e.target.getAttribute('data-slot')) {
+				closeMenus();
+				openMenu(e.target);
+				return;
+			}
 			if (e.target.id !== 'cd-roll-mine') return;
 			state.gear = best(cat, true).wear;
 			draw();

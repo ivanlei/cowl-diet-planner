@@ -29,15 +29,16 @@ void main() {
 	out.append("<div id='cowl-diet'>\n");
 	out.append("<h1>Diet Planner</h1>\n");
 	out.append("<div class='cd-tabs' id='cd-tabs' role='tablist'>"
-		+ "<button type='button' role='tab' class='cd-tab cd-on' data-tab='diet' aria-selected='true'>Diet</button>"
-		+ "<button type='button' role='tab' class='cd-tab' data-tab='rollover' aria-selected='false'>Rollover</button>"
+		+ "<button type='button' role='tab' class='cd-tab cd-on' data-tab='rollover' aria-selected='true'>Rollover</button>"
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='diet' aria-selected='false'>Diet</button>"
 		+ "<button type='button' role='tab' class='cd-tab' data-tab='shopping' aria-selected='false'>Shopping</button></div>\n");
-	out.append("<div id='cd-tab-diet' class='cd-pane' role='tabpanel'>\n");
+	out.append("<div id='cd-tab-diet' class='cd-pane' role='tabpanel' hidden>\n");
 
 	out.append("<div class='cd-controls'>\n");
 	out.append("<label class='cd-budget'>Meat to spend a day <input type='number' id='cd-budget'"
 		+ " min='0' step='5000' inputmode='numeric'></label>\n");
 	out.append("<span class='cd-presets' id='cd-presets'></span>\n");
+	out.append("<button type='button' class='cd-refresh cd-go' id='cd-plan'>Plan</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-refresh'>Update prices from the mall</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-lock'>Save this plan</button>\n");
 	out.append("</div>\n");
@@ -48,13 +49,13 @@ void main() {
 	out.append("<div id='cd-status' class='cd-status'>Reading KoLmafia's tables...</div>\n");
 	out.append("<div id='cd-result'></div>\n");
 
-	out.append("<p class='cd-note'>The plan on screen is checked against the mall as it changes: how many of each"
-		+ " thing are for sale today and at what prices. Nothing on this page buys or eats anything. The big number is"
+	out.append("<p class='cd-note'>Plan works out the day and checks it against the mall: how many of each thing"
+		+ " are for sale today and at what prices. Nothing on this page buys or eats anything. The big number is"
 		+ " adventures from consumption and organ-free extras; rollover is on its own tab. A nightcap leaves you"
 		+ " falling-down drunk, so it comes after the day's turns, and it's counted only up to what fits under the"
 		+ " 200 cap on banked adventures.</p>\n");
 	out.append("</div>\n");
-	out.append("<div id='cd-tab-rollover' class='cd-pane' role='tabpanel' hidden>\n");
+	out.append("<div id='cd-tab-rollover' class='cd-pane' role='tabpanel'>\n");
 	out.append("<div id='cd-rollover' class='cd-rollover'><p class='cd-said'>Reading KoLmafia's tables...</p></div>\n");
 	out.append("</div>\n");
 	out.append("<div id='cd-tab-shopping' class='cd-pane' role='tabpanel' hidden>\n");

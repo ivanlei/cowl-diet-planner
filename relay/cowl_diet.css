@@ -88,7 +88,8 @@ body {
 .cd-price-said { margin-top: 4px; min-height: 1.2em; }
 
 /* --- Save this plan ---------------------------------------------------------- */
-.cd-refresh.cd-locked { font-weight: bold; border: 2px solid var(--cd-big); }
+.cd-refresh.cd-locked, .cd-refresh.cd-go { font-weight: bold; border: 2px solid var(--cd-big); }
+.cd-refresh.cd-go:disabled { border-color: var(--cd-edge); font-weight: normal; }
 .cd-lock-said { margin-top: 4px; color: var(--cd-big); }
 .cd-lock-said:empty { display: none; }
 .cd-roll-locked { color: var(--cd-big) !important; }
@@ -138,6 +139,31 @@ a.cd-wiki:hover { text-decoration: underline; }
 	border-radius: 3px;
 }
 .cd-roll td { vertical-align: middle; }
+.cd-wear input::placeholder { color: var(--cd-note); }
+
+/* A gear box's menu: yours, a line, then better ones you don't have. */
+.cd-combo { position: relative; }
+.cd-menu {
+	position: absolute;
+	z-index: 30;
+	top: 100%;
+	left: 0;
+	min-width: 100%;
+	width: max-content;
+	max-width: min(34em, 90vw);
+	max-height: 20em;
+	overflow-y: auto;
+	margin-top: 2px;
+	background: var(--cd-page);
+	border: 1px solid var(--cd-rule);
+	border-radius: 4px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.cd-menu[hidden] { display: none; }
+.cd-opt { display: flex; justify-content: space-between; gap: 14px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+.cd-opt:hover, .cd-opt.cd-active { background: var(--cd-here); }
+.cd-sep { border-top: 1px solid var(--cd-rule); margin-top: 4px; padding: 5px 8px 2px; font-size: 11px; color: var(--cd-note); }
+.cd-none { padding: 4px 8px; color: var(--cd-note); }
 table.cd-camp, table.cd-rumpus { width: auto; }
 .cd-bank input[type=number] { width: 5em; min-width: 0; margin-right: 4px; }
 
