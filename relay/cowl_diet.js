@@ -568,16 +568,17 @@
 	// The box for the days is drawn once, so typing in it never loses its place; the rest follows.
 	function shopFrame() {
 		if (document.getElementById('cd-days')) return;
-		shopEl.innerHTML = '<h2>Shopping</h2><div class="cd-controls"><label class="cd-budget">Days to shop for' +
+		shopEl.innerHTML = '<h2>Storage shelf</h2><p class="cd-said">A shelf in your display case to keep the diet’s' +
+			' things on, out of the way of anything that tidies your inventory. Moving puts every one you have of them, from' +
+			' your inventory, your closet and Hagnk’s, in the case on that shelf, with any already in the case on another' +
+			' shelf.</p><div class="cd-controls"><label class="cd-budget">Shelf <select id="cd-shelf" disabled><option>' +
+			'reading your display case...</option></select></label><button type="button" class="cd-refresh"' +
+			' id="cd-shelf-move" disabled>Move the diet’s things to this shelf</button></div>' +
+			'<div class="cd-said cd-shelf-said" id="cd-shelf-said"></div>' +
+			'<h2>Shopping</h2><div class="cd-controls"><label class="cd-budget">Days to shop for' +
 			' <input type="number" id="cd-days" min="1" max="366" step="1" value="' + days + '"></label>' +
 			'<span class="cd-said" id="cd-shop-from"></span></div><p class="cd-said" id="cd-shop-note"></p>' +
-			'<div id="cd-shop-list"></div>' +
-			'<h3>Storage shelf</h3><p class="cd-said">A shelf in your display case to keep the diet’s things on, out of' +
-			' the way of anything that tidies your inventory. Moving puts every one you have of them, from your inventory,' +
-			' your closet and Hagnk’s, in the case on that shelf, with any already in the case on another shelf.</p>' +
-			'<div class="cd-controls"><label class="cd-budget">Shelf <select id="cd-shelf" disabled><option>reading your' +
-			' display case...</option></select></label><button type="button" class="cd-refresh" id="cd-shelf-move" disabled>' +
-			'Move the diet’s things to this shelf</button></div><div class="cd-said cd-shelf-said" id="cd-shelf-said"></div>';
+			'<div id="cd-shop-list"></div>';
 		readShelves();
 	}
 
