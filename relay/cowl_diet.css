@@ -177,6 +177,8 @@ table.cd-camp, table.cd-rumpus { width: auto; }
 #cd-days { width: 5em; }
 .cd-shop tr.cd-part td.cd-item { padding-left: 18px; }
 .cd-short { color: light-dark(#b00, #ff7a7a); font-weight: bold; }
+#cd-shelf { max-width: 22em; }
+.cd-shelf-said { margin-top: 4px; min-height: 1.2em; }
 .cd-bank tfoot td { font-weight: bold; }
 
 @media (max-width: 700px) {

@@ -28,11 +28,12 @@
 // Three tabs: rollover (cowl_diet_rollover.js), which counts what you'll wear and have at rollover
 // -- its total and what you leave unplayed are what a nightcap has to fit under the 200 cap with,
 // and the plan tells it back which nightcap it chose; the diet; and shopping, which multiplies the
-// plan by a number of days and takes off what you already have (cowl_diet_shop.ash). Changing a
+// plan by a number of days and takes off what you already have (cowl_diet_shop.ash), and can move
+// all of the diet's things onto a shelf in your display case (cowl_diet_shelf.ash). Changing a
 // switch or the rollover tab dims the plan until Plan is pressed again.
 //
 // The switches start from what KoLmafia says the character has, and are remembered in this
-// browser. Nothing here buys or eats.
+// browser. Nothing here buys or eats; the storage shelf's button is the one thing that moves items.
 
 (function () {
 	var root = document.getElementById('cd-result');
@@ -69,6 +70,7 @@
 	var locked = null;   // the locked plan, while there is one: what's drawn instead of planning
 	var shown = null;    // the plan on screen, live or saved, for the shopping tab
 	var days = 31, shopFor = '', shopRows = null, shopTimer = null;
+	var shelfName = '', shelvesAsked = false;  // the storage shelf, by name
 
 	function esc(s) {
 		return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -569,7 +571,74 @@
 		shopEl.innerHTML = '<h2>Shopping</h2><div class="cd-controls"><label class="cd-budget">Days to shop for' +
 			' <input type="number" id="cd-days" min="1" max="366" step="1" value="' + days + '"></label>' +
 			'<span class="cd-said" id="cd-shop-from"></span></div><p class="cd-said" id="cd-shop-note"></p>' +
-			'<div id="cd-shop-list"></div>';
+			'<div id="cd-shop-list"></div>' +
+			'<h3>Storage shelf</h3><p class="cd-said">A shelf in your display case to keep the diet’s things on, out of' +
+			' the way of anything that tidies your inventory. Moving puts every one you have of them, from your inventory,' +
+			' your closet and Hagnk’s, in the case on that shelf, with any already in the case on another shelf.</p>' +
+			'<div class="cd-controls"><label class="cd-budget">Shelf <select id="cd-shelf" disabled><option>reading your' +
+			' display case...</option></select></label><button type="button" class="cd-refresh" id="cd-shelf-move" disabled>' +
+			'Move the diet’s things to this shelf</button></div><div class="cd-said cd-shelf-said" id="cd-shelf-said"></div>';
+		readShelves();
+	}
+
+	// --- The storage shelf ---------------------------------------------------------------
+	//
+	// Chosen and kept by name (cowl_diet_shelf.ash turns it into KoL's number only when moving), so
+	// adding or removing other shelves never sends the diet's things to the wrong one.
+
+	function readShelves() {
+		if (shelvesAsked) return;
+		shelvesAsked = true;
+		api('cowl_diet_shelf.ash', {action: 'list'}).then(function (res) {
+			var pick = document.getElementById('cd-shelf');
+			if (!res.ok) throw new Error(res.error);
+			if (!res.hasCase) {
+				pick.innerHTML = '<option>you have no display case</option>';
+				return;
+			}
+			shelfName = res.shelves.indexOf(res.chosen) >= 0 ? res.chosen : '';
+			pick.innerHTML = '<option value="">choose a shelf</option>' + res.shelves.map(function (name) {
+				return '<option value="' + esc(name) + '"' + (name === shelfName ? ' selected' : '') + '>' + esc(name) + '</option>';
+			}).join('');
+			pick.disabled = false;
+			shelfButton();
+		}).catch(function (e) {
+			shelvesAsked = false;
+			document.getElementById('cd-shelf-said').textContent = (e && e.message) || 'KoLmafia didn’t answer.';
+		});
+	}
+
+	// What there is to move: the list's things you have anywhere a move takes from or files.
+	function shelfItems() {
+		return (shopRows || []).filter(function (r) {
+			return r.kind !== 'none' && r.inventory + r.closet + r.storage + r.display > 0;
+		});
+	}
+	function shelfButton() {
+		var b = document.getElementById('cd-shelf-move');
+		if (b) b.disabled = !shelfName || !shelfItems().length;
+	}
+
+	function moveToShelf() {
+		var rows = shelfItems(), said = document.getElementById('cd-shelf-said');
+		if (!shelfName || !rows.length) return;
+		var total = rows.reduce(function (n, r) { return n + r.inventory + r.closet + r.storage + r.display; }, 0);
+		if (!window.confirm('Move every one you have of the diet’s ' + rows.length + ' things (' + meat(total) +
+			' in all) to the “' + shelfName + '” shelf in your display case?')) return;
+		var b = document.getElementById('cd-shelf-move');
+		b.disabled = true;
+		said.textContent = 'Moving them to “' + shelfName + '”...';
+		post('cowl_diet_shelf.ash', {action: 'move', shelf: shelfName,
+			items: rows.map(function (r) { return r.name; }).join('|')}).then(function (res) {
+			if (!res.ok) throw new Error(res.error);
+			said.textContent = 'Put ' + res.shelved + (res.shelved === 1 ? ' thing' : ' things') + ' on “' + res.shelf + '”.' +
+				(res.skipped.length ? ' A display case won’t take ' + res.skipped.join(', ') + ', so they’re where they were.' : '');
+			shopFor = '';  // where everything is now
+			askShop();
+		}).catch(function (e) {
+			said.textContent = (e && e.message) || 'KoLmafia didn’t answer.';
+			shelfButton();
+		});
 	}
 
 	function shopSay(list) {
@@ -597,6 +666,7 @@
 			if (key !== shopFor) return;  // a newer list was asked for
 			shopRows = res.rows;
 			drawShop();
+			shelfButton();
 			fetchFacts(shopRows.map(function (r) { return r.name; }));
 		}).catch(function (e) {
 			shopSay('<p class="cd-said">' + esc((e && e.message) || 'KoLmafia didn’t answer.') + '</p>');
@@ -650,6 +720,15 @@
 		shopSay(h.join(''));
 	}
 
+	shopEl.addEventListener('change', function (e) {
+		if (e.target.id !== 'cd-shelf') return;
+		shelfName = e.target.value;
+		post('cowl_diet_save.ash', {key: 'shelf', value: shelfName}).catch(function () { /* kept next time */ });
+		shelfButton();
+	});
+	shopEl.addEventListener('click', function (e) {
+		if (e.target.id === 'cd-shelf-move') moveToShelf();
+	});
 	shopEl.addEventListener('input', function (e) {
 		if (e.target.id !== 'cd-days') return;
 		var d = parseInt(e.target.value, 10);

@@ -2,8 +2,8 @@
 
 A KoLmafia relay page for Kingdom of Loathing: give it how much meat you'll spend on a day's
 consumption and it works out the most adventures that buys — what to eat, drink and chew, with the
-cleaners, the once-a-day boosters and a nightcap, and the order to do it in. It plans and nothing
-else: nothing on it buys, eats or moves anything.
+cleaners, the once-a-day boosters and a nightcap, and the order to do it in. It never buys or eats
+anything; the one thing it moves is the diet's things onto a display case shelf, when you ask it to.
 
 It has three tabs:
 
@@ -180,6 +180,14 @@ how many the mall has today where the plan's check asked, flags anything there i
 gives a rough bill at KoLmafia's recorded prices. The Feast of Boris day eats more: shop for it on its
 own.
 
+**Storage shelf** keeps what you've bought out of the way of anything that tidies your inventory:
+choose a shelf in your display case, by name, and **Move the diet's things to this shelf** puts every
+one you have of the list's things in the case on it, after asking. That's whatever is in your
+inventory, your closet and Hagnk's (Hagnk's only when taking from it is free), along with any already
+in the case on another shelf. Worn items stay worn, and anything a display case won't take stays where
+it is. The shelf is kept by its name, so adding or removing other shelves doesn't send things to the
+wrong one.
+
 ## What it counts
 
 - Every food, drink and spleen item KoLmafia knows that has a price, that you're high enough level
@@ -204,7 +212,8 @@ cleaners and expanders tried in and out; doing that at every value from 10 meat 
 ## What it keeps
 
 In KoLmafia's preferences: `cowlDietRollover` (the Rollover tab's choices), `cowlDietLocked` (a locked
-plan) and `cowlDietPricesRefreshed` (when the prices button last ran). In the browser: the budget,
+plan), `cowlDietShelf` (the storage shelf, by name) and `cowlDietPricesRefreshed` (when the prices
+button last ran). In the browser: the budget,
 switches, tab and days, and the mall's answers for three hours.
 
 ## Files
@@ -214,7 +223,8 @@ switches, tab and days, and the mall's answers for three hours.
   `cowl_diet_rollover.js` — the Rollover tab.
 - `relay/cowl_diet_data.ash` (organs, what you own, the priced menu), `cowl_diet_price.ash` (the mall
   check), `cowl_diet_refresh.ash` (the prices button), `cowl_diet_rollover.ash` (the rollover
-  catalogue), `cowl_diet_shop.ash` (the shopping list), `cowl_diet_items.ash` (pictures and
+  catalogue), `cowl_diet_shop.ash` (the shopping list), `cowl_diet_shelf.ash` (the storage shelf: the
+  display case's shelves, and moving things onto one), `cowl_diet_items.ash` (pictures and
   description ids), `cowl_diet_save.ash` (the preferences) — the JSON endpoints the page reads.
 - `relay/cowl_diet_assets.ash` — what every script needs: addresses for the page's own files, names
   as plain text, and how many of something you own.
