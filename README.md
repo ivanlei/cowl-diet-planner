@@ -43,7 +43,8 @@ category, `historical_age` and `git_info`, among others.
 Type a budget, or pick one of the buttons, and the page shows:
 
 - **the adventures** that much meat buys from consumption and organ-free extras;
-- **a day's turns**: rollover, the plan, the Rumpus Room's clicks and the potato alarm clock added up;
+- **a day's turns**: rollover, the plan, the Rumpus Room's clicks, the potato alarm clock and the etched
+  hourglass added up;
 - each organ's size and where every point of it comes from;
 - **the plan, in order, as a table**: cast Ode, equip the ring, get Refined Palate, the first drinks,
   eating (milk first, each dieting pill just before the food it doubles), chewing, drinking, cleaners
@@ -151,7 +152,8 @@ Below that:
   Calendar +1. These are clicked once a day rather than added at rollover, so the cap doesn't touch
   them. The two calendars share a nail; one counts.
 - **Also**: passive skills that add adventures, the Squamous Gibberer out for the day's fights
-  (counted as 30), Recall Facts: Circadian Rhythms (up to 11) and the potato alarm clock (+5 at the
+  (counted as 30), Recall Facts: Circadian Rhythms (up to 11), the etched hourglass (+5 a day when
+  you use it, outside the cap) and the potato alarm clock (+5 at the
   first login, past the cap), each only if you have it.
 
 Changing any of it plans again. The choices are kept in a KoLmafia preference, so every browser sees

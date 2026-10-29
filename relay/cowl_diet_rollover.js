@@ -33,6 +33,7 @@
 	var GIBBERER = 30;    // +1 a night per 15 fights with it out: a 450-fight day
 	var CIRCADIAN = 11;   // the most Recall Facts: Circadian Rhythms banks in a day
 	var POTATO = 5;       // at the first login, past the cap
+	var HOURGLASS = 5;    // the etched hourglass, used once a day: the day's turns, not the night's
 
 	function key(s) { return String(s || '').trim().toLowerCase(); }
 	function index(cat) {
@@ -191,7 +192,8 @@
 	// then whatever was chosen last time.
 	function initial(cat) {
 		var s = {gear: best(cat, true).wear, maid: '', camp: {}, rumpus: {}, unplayed: 0,
-			gibberer: !!cat.today.gibberer, circadian: !!cat.today.circadian, potato: !!cat.today.potatoClock};
+			gibberer: !!cat.today.gibberer, circadian: !!cat.today.circadian, potato: !!cat.today.potatoClock,
+			hourglass: !!cat.today.hourglass};
 		cat.campground.forEach(function (c) {
 			if (c.kind === 'maid') { if (c.have) s.maid = c.name; } else s.camp[c.name] = c.have;
 		});
@@ -199,7 +201,9 @@
 		var saved = null;
 		try { saved = cat.saved ? JSON.parse(cat.saved) : null; } catch (e) { saved = null; }
 		if (saved && saved.v === 1) {
-			['maid', 'gibberer', 'circadian', 'potato', 'unplayed'].forEach(function (k) { if (k in saved) s[k] = saved[k]; });
+			['maid', 'gibberer', 'circadian', 'potato', 'hourglass', 'unplayed'].forEach(function (k) {
+				if (k in saved) s[k] = saved[k];
+			});
 			['gear', 'camp', 'rumpus'].forEach(function (k) {
 				Object.keys(saved[k] || {}).forEach(function (n) { s[k][n] = saved[k][n]; });
 			});
@@ -228,6 +232,7 @@
 		var total = Math.min(200, BASE + t.total + camp + skills + gibberer + circadian);
 		return {tally: t, gear: t.total, camp: camp, skills: skills, gibberer: gibberer, circadian: circadian,
 			total: total, clicks: clicks, potato: s.potato && cat.today.potatoClock ? POTATO : 0,
+			hourglass: s.hourglass && cat.today.hourglass ? HOURGLASS : 0,
 			unplayed: Math.max(0, Math.min(200, Math.round(s.unplayed) || 0))};
 	}
 
@@ -377,6 +382,11 @@
 				also.push('<li><label><input type="checkbox" data-other="potato"' + (state.potato ? ' checked' : '') +
 					'> potato alarm clock</label>: +' + POTATO + ' at the first login of the day, past the cap</li>');
 			}
+			if (cat.today.hourglass) {
+				also.push('<li><label><input type="checkbox" data-other="hourglass"' + (state.hourglass ? ' checked' : '') +
+					'> etched hourglass</label>: +' + HOURGLASS + ' when you use it, once a day; added to the day, not at' +
+					' rollover, so the cap doesn\u2019t touch it</li>');
+			}
 			if (also.length) h.push('<h3>Also</h3><ul class="cd-organs">' + also.join('') + '</ul>');
 			el.innerHTML = '<p class="cd-said cd-roll-locked" hidden>These are locked with the saved plan: unlock it on the' +
 				' Diet tab to change them.</p>' + h.join('');
@@ -465,6 +475,7 @@
 		function keep() {
 			var q = 'rollover=' + encodeURIComponent(JSON.stringify({v: 1, gear: state.gear, maid: state.maid, camp: state.camp,
 				rumpus: state.rumpus, gibberer: state.gibberer, circadian: state.circadian, potato: state.potato,
+				hourglass: state.hourglass,
 				unplayed: state.unplayed}));
 			fetch('cowl_diet_save.ash?pwd=' + encodeURIComponent(window.cowlDietPwd) + '&' + q, {credentials: 'same-origin'})
 				.catch(function () { /* kept next time */ });

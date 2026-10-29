@@ -12,7 +12,8 @@
 // - the campground and Chateau items that add adventures, installed or worth installing; the
 //   clan Rumpus Room's adventure furniture, which since 2025 is a daily click, not rollover;
 // - passive skills that add adventures, and today's banks (Circadian Rhythms, the Squamous
-//   Gibberer, the Wild Hare, resolutions).
+//   Gibberer, the Wild Hare, resolutions); the potato alarm clock and the etched hourglass, which add
+//   to the day rather than the night.
 //
 // It reads and nothing else; cowl_diet_save.ash keeps the choices.
 
@@ -216,6 +217,7 @@ void main() {
 	out.append(",\"hareAdv\":" + get_property("_hareAdv").to_int());
 	out.append(",\"resolutionAdv\":" + get_property("_resolutionAdv").to_int());
 	out.append(",\"potatoClock\":" + (available_amount($item[potato alarm clock]) > 0));
+	out.append(",\"hourglass\":" + (dietOwned($item[etched hourglass]) > 0));
 	out.append(",\"circadian\":" + have_skill($skill[Just the Facts]));
 	out.append(",\"gibberer\":" + have_familiar($familiar[Squamous Gibberer]));
 	out.append("}}");

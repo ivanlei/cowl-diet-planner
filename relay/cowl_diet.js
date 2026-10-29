@@ -331,7 +331,8 @@
 		});
 		return {v: 1, adv: p[0], meat: p[1], budget: budget, feast: !!choices.feast, rows: rows,
 			organs: organLines(p[2]), curve: curve, items: countsOf(p[2]), into: into, night: nightOf(rows),
-			roll: rollSum ? {total: rollSum.total, clicks: rollSum.clicks, potato: rollSum.potato, unplayed: rollSum.unplayed} : null};
+			roll: rollSum ? {total: rollSum.total, clicks: rollSum.clicks, potato: rollSum.potato, hourglass: rollSum.hourglass,
+				unplayed: rollSum.unplayed} : null};
 	}
 
 	function draw() {
@@ -352,8 +353,9 @@
 			var day = [v.roll.total + ' at rollover', Math.round(v.adv) + ' from this plan'];
 			if (v.roll.clicks) day.push(v.roll.clicks + ' from the Rumpus Room');
 			if (v.roll.potato) day.push(v.roll.potato + ' from the potato alarm clock');
+			if (v.roll.hourglass) day.push(v.roll.hourglass + ' from the etched hourglass');
 			html.push('<div class="cd-day">A day’s turns: ' + esc(day.join(' + ')) + ' = <b>' +
-				(v.roll.total + Math.round(v.adv) + v.roll.clicks + v.roll.potato) + '</b></div>');
+				(v.roll.total + Math.round(v.adv) + v.roll.clicks + v.roll.potato + (v.roll.hourglass || 0)) + '</b></div>');
 		}
 		html.push(v.organs);
 		html.push('<h2>In order</h2>' + rowsTable(v.rows));
