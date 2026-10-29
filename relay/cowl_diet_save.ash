@@ -4,10 +4,10 @@
 // ones rather than one browser's storage:
 //
 //   rollover  cowlDietRollover  the gear picked for each slot, the campground, what's left unplayed
-//   locked    cowlDietLocked    a saved plan: while it's set the page shows it as it was and plans
-//                               nothing (Save this plan); empty to unlock
+//   locked    cowlDietLocked    a locked plan: while it's set the page shows it as it was and plans
+//                               nothing (Lock); empty to unlock
 //
-// The page sends the whole value as JSON, POSTed (a saved plan is too long for a URL); this stores
+// The page sends the whole value as JSON, POSTed (a locked plan is too long for a URL); this stores
 // it and nothing else. An empty value clears it.
 
 void main() {

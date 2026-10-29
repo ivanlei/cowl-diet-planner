@@ -71,7 +71,7 @@ The table's columns:
 Plan takes about 12 seconds, then checks the plan against the mall. After that, changing the budget
 picks that budget's plan at once, and says if anything in it hasn't been checked yet; press Plan to
 check it. Changing a switch, or anything on the Rollover tab, dims the plan until you press Plan
-again. Plan is off while a plan is saved. The switches start from what KoLmafia says you have, and
+again. Plan is off while a plan is locked. The switches start from what KoLmafia says you have, and
 the page remembers your changes:
 
 | Switch | What it changes |
@@ -85,12 +85,13 @@ the page remembers your changes:
 | mafia pinky ring | Wine +12.5%, which with Refined Palate makes cheap wine very good |
 | Grimace map pills | With the Map to Safety Shelter Grimace Prime: a distention pill and a synthetic dog hair pill a day, for a transporter transponder and 2 adventures |
 
-### Save this plan
+### Lock
 
-**Save this plan** keeps the plan on screen and everything behind it in a KoLmafia preference. Until
-you press **Unlock**, the page shows exactly that plan every time it's opened, in any browser, and
-plans and prices nothing; Plan, the budget, the switches, the prices button and the Rollover tab's
-boxes are frozen. After unlocking, press Plan to plan again from the saved choices.
+**Lock** keeps the plan on screen and everything behind it in a KoLmafia preference. Until you press
+**Unlock**, the page shows exactly that plan every time it's opened, in any browser, and plans and
+prices nothing; Plan, the budget, the switches, the prices button and the Rollover tab's boxes are
+frozen, though still easy to read. After unlocking, press Plan to plan again from the locked
+choices.
 
 ### Prices, and what's for sale
 
@@ -170,7 +171,7 @@ the same ones.
 
 ## The Shopping tab
 
-The plan on screen, or the saved one, times a number of days (31 to start), less what you already
+The plan on screen, or the locked one, times a number of days (31 to start), less what you already
 have in your inventory, closet, Hagnk's and display case. For each thing: how many a day, for the
 days, what you have and where, and how many more to get. Something you'd cook or mix rather than buy
 (the Before Yore casserole) comes apart into what goes in it, for as many as you're short. It shows
@@ -201,7 +202,7 @@ cleaners and expanders tried in and out; doing that at every value from 10 meat 
 
 ## What it keeps
 
-In KoLmafia's preferences: `cowlDietRollover` (the Rollover tab's choices), `cowlDietLocked` (a saved
+In KoLmafia's preferences: `cowlDietRollover` (the Rollover tab's choices), `cowlDietLocked` (a locked
 plan) and `cowlDietPricesRefreshed` (when the prices button last ran). In the browser: the budget,
 switches, tab and days, and the mall's answers for three hours.
 

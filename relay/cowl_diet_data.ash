@@ -171,7 +171,7 @@ void main() {
 	out.append(",\"feastToday\":" + feastToday);
 	out.append(",\"rollover\":" + numeric_modifier("Adventures").to_int());
 	out.append(",\"level\":" + my_level());
-	// a saved plan (Save this plan): while there is one, the page shows it and plans nothing
+	// a locked plan (Lock): while there is one, the page shows it and plans nothing
 	out.append(",\"locked\":" + dietQuoted(get_property("cowlDietLocked")));
 	// how long ago the prices button refreshed the mall's prices, in days; -1 for never
 	string refreshed = get_property("cowlDietPricesRefreshed");
