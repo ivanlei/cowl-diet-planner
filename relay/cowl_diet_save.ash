@@ -1,11 +1,13 @@
 // cowl_diet_save.ash -- keeps the Diet Planner's choices in KoLmafia.
 //
-// Two things, each in its own preference, so every browser the page is opened in sees the same
+// Three things, each in its own preference, so every browser the page is opened in sees the same
 // ones rather than one browser's storage:
 //
 //   rollover  cowlDietRollover  the gear picked for each slot, the campground, what's left unplayed
 //   locked    cowlDietLocked    a locked plan: while it's set the page shows it as it was and plans
 //                               nothing (Lock); empty to unlock
+//   shelf     cowlDietShelf     the display case shelf the Shopping tab keeps the diet's things on,
+//                               by name
 //
 // The page sends the whole value as JSON, POSTed (a locked plan is too long for a URL); this stores
 // it and nothing else. An empty value clears it.
@@ -21,8 +23,8 @@ void main() {
 		key = "rollover";
 		value = form_field("rollover");
 	}
-	string [string] prefs = {"rollover": "cowlDietRollover", "locked": "cowlDietLocked"};
-	int [string] longest = {"rollover": 4000, "locked": 100000};
+	string [string] prefs = {"rollover": "cowlDietRollover", "locked": "cowlDietLocked", "shelf": "cowlDietShelf"};
+	int [string] longest = {"rollover": 4000, "locked": 100000, "shelf": 200};
 	if (!(prefs contains key)) {
 		write("{\"ok\":false,\"error\":\"Nothing to keep by that name.\"}");
 		return;
