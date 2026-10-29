@@ -1,0 +1,153 @@
+/* cowl_diet.css -- the Diet Planner page, all of its styling.
+ *
+ * Light and dark follow the browser's setting: every colour is a light-dark() pair, which
+ * color-scheme lets the browser choose between.
+ */
+:root {
+	color-scheme: light dark;
+	--cd-page:   light-dark(#fff, #000);
+	--cd-ink:    light-dark(#000, #d6d9dd);
+	--cd-link:   light-dark(#1d4f91, #9dbaff);
+	--cd-panel:  light-dark(#f4f4f4, #191c21);
+	--cd-edge:   light-dark(#ccc, #4a515b);
+	--cd-rule:   light-dark(#888, #7d8590);
+	--cd-note:   light-dark(#666, #a3a9b1);
+	--cd-here:   light-dark(#eef3fb, #1c2533);
+	--cd-big:    light-dark(#1d4f91, #7aa2ff);
+	--cd-ok:     light-dark(green, #5fab5f);
+}
+
+body {
+	background: var(--cd-page);
+	color: var(--cd-ink);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 13px;
+	margin: 0;
+	padding: 8px;
+}
+
+#cowl-diet {
+	max-width: 1000px;
+	margin: 0 auto;
+}
+
+#cowl-diet h1 { font-size: 18px; margin: 4px 0 10px; }
+#cowl-diet h2 { font-size: 15px; margin: 18px 0 6px; }
+#cowl-diet h3 { font-size: 13px; margin: 0 0 4px; }
+
+/* --- The tabs --------------------------------------------------------------- */
+.cd-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--cd-rule); margin-bottom: 12px; }
+.cd-tab {
+	padding: 6px 16px;
+	font-size: 14px;
+	border: 1px solid var(--cd-edge);
+	border-bottom: none;
+	border-radius: 6px 6px 0 0;
+	background: var(--cd-panel);
+	color: var(--cd-note);
+	cursor: pointer;
+}
+.cd-tab.cd-on { background: var(--cd-page); color: var(--cd-ink); font-weight: bold; border-color: var(--cd-rule); }
+.cd-pane[hidden] { display: none; }
+
+.cd-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cd-budget input { width: 9em; font-size: 14px; padding: 3px 6px; margin-left: 4px; }
+.cd-presets button {
+	margin-right: 4px;
+	padding: 3px 9px;
+	border: 1px solid var(--cd-edge);
+	border-radius: 10px;
+	background: var(--cd-panel);
+	color: var(--cd-ink);
+	cursor: pointer;
+}
+.cd-switches { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0; }
+.cd-switches label { cursor: pointer; white-space: nowrap; }
+
+.cd-status { color: var(--cd-note); margin: 8px 0; min-height: 1.2em; }
+.cd-head { font-size: 15px; margin: 6px 0 2px; }
+.cd-adv { font-size: 28px; font-weight: bold; color: var(--cd-big); }
+.cd-organs { margin: 4px 0 12px; padding-left: 18px; line-height: 1.5; }
+.cd-organs li { margin: 2px 0; }
+
+.cd-n { font-weight: bold; }
+.cd-ok { color: var(--cd-ok); }
+
+
+.cd-said { color: var(--cd-note); }
+
+.cd-curve { border-collapse: collapse; }
+.cd-curve th, .cd-curve td { padding: 3px 12px; border-bottom: 1px solid var(--cd-edge); text-align: right; }
+.cd-curve tr[data-b] { cursor: pointer; }
+.cd-curve tr.cd-here { background: var(--cd-here); font-weight: bold; }
+
+.cd-note { color: var(--cd-note); margin-top: 22px; line-height: 1.4; max-width: 70em; }
+
+/* --- The prices button ---------------------------------------------------- */
+.cd-refresh { padding: 4px 10px; cursor: pointer; margin-left: 6px; }
+.cd-price-said { margin-top: 4px; min-height: 1.2em; }
+
+/* --- Save this plan ---------------------------------------------------------- */
+.cd-refresh.cd-locked { font-weight: bold; border: 2px solid var(--cd-big); }
+.cd-lock-said { margin-top: 4px; color: var(--cd-big); }
+.cd-lock-said:empty { display: none; }
+.cd-roll-locked { color: var(--cd-big) !important; }
+
+/* --- The plan, in order ----------------------------------------------------
+ *
+ * The picture has a cell of its own and the name is in bold beside it, a link to the wiki; an
+ * item's picture opens KoL's description of it. */
+table.cd-order { border-collapse: collapse; width: 100%; }
+.cd-order th {
+	text-align: left;
+	font-size: 12px;
+	padding: 4px 6px;
+	border-bottom: 2px solid var(--cd-rule);
+	white-space: nowrap;
+}
+.cd-order td { padding: 4px 6px; border-bottom: 1px solid var(--cd-edge); vertical-align: top; }
+.cd-order tfoot td { font-weight: bold; border-bottom: none; border-top: 2px solid var(--cd-rule); }
+.cd-act { white-space: nowrap; color: var(--cd-note); }
+.cd-icon { width: 34px; padding-right: 0 !important; }
+.cd-icon img { width: 30px; height: 30px; }
+.cd-icon img[data-desc] { cursor: pointer; }
+a.cd-wiki { color: var(--cd-link); text-decoration: none; }
+a.cd-wiki:hover { text-decoration: underline; }
+.cd-item { min-width: 180px; }
+.cd-sub { color: var(--cd-note); font-size: 12px; margin-top: 2px; }
+.cd-mods { margin-top: 3px; }
+.cd-why { font-size: 12px; color: var(--cd-note); max-width: 320px; }
+.cd-num { text-align: right; white-space: nowrap; }
+.cd-day { margin: 2px 0 6px; }
+#cd-result.cd-stale { opacity: 0.45; pointer-events: none; }
+
+/* --- Rollover ---------------------------------------------------------------
+ *
+ * The same table as the plan; a slot's box fills its cell. */
+.cd-rollover { margin-top: 10px; }
+#cowl-diet .cd-rollover h3 { margin-top: 18px; }
+.cd-wear input {
+	width: 100%;
+	min-width: 14em;
+	box-sizing: border-box;
+	padding: 3px 5px;
+	font-size: 13px;
+	background: var(--cd-page);
+	color: var(--cd-ink);
+	border: 1px solid var(--cd-edge);
+	border-radius: 3px;
+}
+.cd-roll td { vertical-align: middle; }
+table.cd-camp, table.cd-rumpus { width: auto; }
+.cd-bank input[type=number] { width: 5em; min-width: 0; margin-right: 4px; }
+
+/* --- Shopping ----------------------------------------------------------------- */
+#cd-days { width: 5em; }
+.cd-shop tr.cd-part td.cd-item { padding-left: 18px; }
+.cd-short { color: light-dark(#b00, #ff7a7a); font-weight: bold; }
+.cd-bank tfoot td { font-weight: bold; }
+
+@media (max-width: 700px) {
+	.cd-why { max-width: none; }
+	table.cd-order { font-size: 12px; }
+}

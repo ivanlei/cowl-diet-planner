@@ -1,0 +1,46 @@
+# cowl_diet_limits.txt -- consumables with a use limit, for relay_Diet_Planner.ash.
+# Written by tools/diet_limits.py from KoLmafia's dailylimits.txt; don't edit by hand.
+# item id	tracking preference	uses a day (or an ascension, without a leading _)
+8820	_authorsInkUsed	1
+8824	_inquisitorsUnidentifiableObjectUsed	1
+8817	_mansquitoSerumUsed	1
+9166	_turkeyBlastersUsed	3
+3326	_voodooSnuffUsed	1
+7593	_speakeasyDrinksDrunk	3
+7590	_speakeasyDrinksDrunk	3
+8822	_docClocksThymeCocktailDrunk	1
+7598	_speakeasyDrinksDrunk	3
+3324	_frostyMugUsed	1
+3398	_hodgmansBlanketDrunk	1
+7596	_speakeasyDrinksDrunk	3
+7595	_speakeasyDrinksDrunk	3
+7592	_speakeasyDrinksDrunk	3
+8818	_missGravesVermouthDrunk	1
+7597	_speakeasyDrinksDrunk	3
+7599	_speakeasyDrinksDrunk	3
+7594	_speakeasyDrinksDrunk	3
+8821	_madLiquorDrunk	1
+10525	_drippyPilsnerUsed	1
+9966	_everfullGlassUsed	1
+7589	_speakeasyDrinksDrunk	3
+10446	_drippyWineUsed	1
+3325	_pickleJuiceDrunk	1
+7591	_speakeasyDrinksDrunk	3
+10992	calzoneOfLegendEaten	1
+11000	deepDishOfLegendEaten	1
+8816	_kudzuSaladEaten	1
+8823	_mrBurnsgerEaten	1
+3323	_saladForkUsed	1
+10991	pizzaOfLegendEaten	1
+8819	_plumbersMushroomStewEaten	1
+10207	_glitchMonsterFights	1
+9486	_affirmationCookieEaten	1
+10447	_drippyCaviarUsed	1
+10445	_drippyNuggetUsed	1
+10448	_drippyPlumUsed	1
+3327	_extraGreasySliderEaten	1
+5459	_fudgeSporkUsed	1
+10060	_sausagesEaten	23
+10227	_pirateForkUsed	1
+6616	_spaghettiBreakfastEaten	1
+3131	_mulliganStewEaten	1
