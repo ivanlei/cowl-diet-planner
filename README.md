@@ -88,7 +88,8 @@ the page remembers your changes:
 ### Lock
 
 **Lock** keeps the plan on screen and everything behind it in a KoLmafia preference. Until you press
-**Unlock**, the page shows exactly that plan every time it's opened, in any browser, and plans and
+**Unlock** (which asks "Unlock and discard this plan?" first), the page shows exactly that plan every
+time it's opened, in any browser, and plans and
 prices nothing; Plan, the budget, the switches, the prices button and the Rollover tab's boxes are
 frozen, though still easy to read. After unlocking, press Plan to plan again from the locked
 choices.

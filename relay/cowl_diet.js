@@ -517,8 +517,11 @@
 	}
 
 	// Lock: the plan on screen and the choices behind it go into a KoLmafia preference, and
-	// the page shows that until it's unlocked. Unlocking clears it and plans again from those choices.
+	// the page shows that until it's unlocked. Unlocking, once confirmed, clears it; Plan then plans
+	// again from those choices.
 	function toggleLock() {
+		// a locked plan is what you shopped for: unlocking throws it away, so it asks first
+		if (locked && !window.confirm('Unlock and discard this plan?')) return;
 		lockBtn.disabled = true;
 		var snap = null;
 		if (!locked) {
