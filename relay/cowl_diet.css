@@ -87,9 +87,15 @@ body {
 .cd-refresh { padding: 4px 10px; cursor: pointer; margin-left: 6px; }
 .cd-price-said { margin-top: 4px; min-height: 1.2em; }
 
-/* --- Save this plan ---------------------------------------------------------- */
+/* --- Lock ------------------------------------------------------------------- */
 .cd-refresh.cd-locked, .cd-refresh.cd-go { font-weight: bold; border: 2px solid var(--cd-big); }
 .cd-refresh.cd-go:disabled { border-color: var(--cd-edge); font-weight: normal; }
+
+/* Locked: what can't be changed stays readable. Boxes are read-only and ticks ignore clicks rather
+ * than being disabled, which a browser greys out; a disabled button keeps a legible grey label. */
+.cd-refresh:disabled, .cd-presets button:disabled { color: var(--cd-note); cursor: default; }
+input[readonly] { background: var(--cd-panel); cursor: default; }
+.cd-frozen input[type=checkbox], .cd-frozen input[type=radio], .cd-frozen label { cursor: default; }
 .cd-lock-said { margin-top: 4px; color: var(--cd-big); }
 .cd-lock-said:empty { display: none; }
 .cd-roll-locked { color: var(--cd-big) !important; }

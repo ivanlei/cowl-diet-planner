@@ -345,6 +345,7 @@
 				'</span></div>';
 		}
 		function openMenu(input) {
+			if (locked) return;
 			var slot = input.getAttribute('data-slot'), c = choices(cat, slot, state.gear.familiar, mine.wear);
 			var q = key(input.value), all = c.owned.concat(c.rest);
 			// a box that already holds one of them still offers them all, so it can be changed
@@ -468,16 +469,26 @@
 					' rollover, so the cap doesn\u2019t touch it</li>');
 			}
 			if (also.length) h.push('<h3>Also</h3><ul class="cd-organs">' + also.join('') + '</ul>');
-			el.innerHTML = '<p class="cd-said cd-roll-locked" hidden>These are locked with the saved plan: unlock it on the' +
+			el.innerHTML = '<p class="cd-said cd-roll-locked" hidden>These are locked with the plan: unlock it on the' +
 				' Diet tab to change them.</p>' + h.join('');
 			lock(locked);
 			count(true);
 		}
 
+		// Locked boxes stay as readable as unlocked ones: text is read-only, a click on a box or a
+		// button is ignored, and nothing is greyed out the way the browser draws a disabled control.
 		function lock(on) {
 			locked = !!on;
 			el.querySelector('.cd-roll-locked').hidden = !locked;
-			Array.prototype.forEach.call(el.querySelectorAll('input, button'), function (x) { x.disabled = locked; });
+			el.className = el.className.replace(/ ?cd-frozen/g, '') + (locked ? ' cd-frozen' : '');
+			closeMenus();
+			Array.prototype.forEach.call(el.querySelectorAll('input[type=text], input[type=number]'), function (x) {
+				x.readOnly = locked;
+			});
+			Array.prototype.forEach.call(el.querySelectorAll('button'), function (x) { x.disabled = locked; });
+			Array.prototype.forEach.call(el.querySelectorAll('input[type=checkbox], input[type=radio]'), function (x) {
+				x.setAttribute('aria-disabled', locked ? 'true' : 'false');
+			});
 		}
 
 		function campCells(c, best) {
@@ -522,7 +533,7 @@
 			set('u', sum.unplayed);
 			if (!night) {
 				set('cap', '<span class="cd-said">press Plan on the Diet tab for a nightcap</span>');
-			} else if (night.room !== undefined && night.room !== room) {
+			} else if (night.room !== undefined && night.room !== room && !locked) {
 				set('cap', '<span class="cd-said">press Plan on the Diet tab to fit a nightcap to the ' + room + ' left</span>');
 				cap = null;
 				n = 0;
@@ -533,7 +544,8 @@
 					' meat a day' : 'none: rollover and what you leave unplayed already reach 200') + '</span>');
 			} else {
 				set('cap', '<b>' + esc(cap.name) + '</b><div class="cd-sub">the diet plan’s for ' + meat(night.budget) +
-					' meat a day: ' + n + ' of the ' + room + ' left under the cap, for ' + meat(cap.cost) + ' meat' +
+					' meat a day: ' + n + ' of the ' + (locked && night.room !== undefined ? night.room : room) +
+					' left under the cap, for ' + meat(cap.cost) + ' meat' +
 					(cap.over ? '; it rolls ' + (n + cap.over) + ', and the plan doesn’t pay for the ' + cap.over + ' the cap takes'
 						: '') + '</div>');
 			}
@@ -599,7 +611,13 @@
 		el.addEventListener('mousedown', function (e) {
 			if (e.target.closest && e.target.closest('.cd-menu')) e.preventDefault();
 		});
+		// a locked box ignores the click, so a tick never flips
+		el.addEventListener('click', function (e) {
+			var t = e.target;
+			if (locked && t.type && (t.type === 'checkbox' || t.type === 'radio')) e.preventDefault();
+		}, true);
 		el.addEventListener('change', function (e) {
+			if (locked) return;
 			var t = e.target, m = t.getAttribute('data-maid'), c = t.getAttribute('data-camp');
 			var r = t.getAttribute('data-rumpus'), o = t.getAttribute('data-other');
 			if (m !== null) state.maid = m;

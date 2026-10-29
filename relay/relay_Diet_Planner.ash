@@ -6,7 +6,7 @@
 // nightcap and the mime army shotglass -- whichever of those this character has. Then the order to
 // do it in. On a second tab, rollover: the gear, campground and clan furniture that add adventures
 // each night, the best there is beside what you have, and tonight's bank against the 200 cap. On a
-// third, shopping: the plan times a number of days, less what you have. Save this plan keeps a plan
+// third, shopping: the plan times a number of days, less what you have. Lock keeps a plan
 // (in KoLmafia's preferences) so the page shows it as it was until it's unlocked.
 //
 // The relay_ prefix is what puts it in the Scripts menu, where it arrives as "Diet Planner".
@@ -40,7 +40,7 @@ void main() {
 	out.append("<span class='cd-presets' id='cd-presets'></span>\n");
 	out.append("<button type='button' class='cd-refresh cd-go' id='cd-plan'>Plan</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-refresh'>Update prices from the mall</button>\n");
-	out.append("<button type='button' class='cd-refresh' id='cd-lock'>Save this plan</button>\n");
+	out.append("<button type='button' class='cd-refresh' id='cd-lock'>Lock</button>\n");
 	out.append("</div>\n");
 	out.append("<div id='cd-lock-said' class='cd-lock-said'></div>\n");
 	out.append("<div id='cd-price-said' class='cd-said cd-price-said'></div>\n");

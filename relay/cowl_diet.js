@@ -21,7 +21,7 @@
 // "Update prices from the mall" has KoLmafia refresh its prices for every food, booze and other
 // consumable at once (cowl_diet_refresh.ash); what that didn't find for sale drops out.
 //
-// "Save this plan" keeps the plan on screen, and the choices behind it, in a KoLmafia preference
+// "Lock" keeps the plan on screen, and the choices behind it, in a KoLmafia preference
 // (cowlDietLocked, through cowl_diet_save.ash). Until it's unlocked the page shows that plan exactly
 // as it was, every time it's opened, and plans and prices nothing.
 //
@@ -66,7 +66,7 @@
 	var DONE = 'Every item in this plan is for sale today, priced for the quantity it takes.';
 	var rollSum = null, rollApi = null;  // the rollover section's count, once it's drawn
 	var tab = 'diet';
-	var locked = null;   // the saved plan, while there is one: what's drawn instead of planning
+	var locked = null;   // the locked plan, while there is one: what's drawn instead of planning
 	var shown = null;    // the plan on screen, live or saved, for the shopping tab
 	var days = 31, shopFor = '', shopRows = null, shopTimer = null;
 
@@ -84,7 +84,7 @@
 	function api(file, params) {
 		return fetch(file + '?' + query(params), {credentials: 'same-origin'}).then(function (r) { return r.json(); });
 	}
-	// For what's too long for a URL: a saved plan, a long shopping list.
+	// For what's too long for a URL: a locked plan, a long shopping list.
 	function post(file, params) {
 		return fetch(file, {method: 'POST', credentials: 'same-origin', body: query(params),
 			headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(function (r) { return r.json(); });
@@ -139,19 +139,24 @@
 		lockControls();
 	}
 
-	// While a plan is saved nothing that would change it can be touched.
+	// While a plan is locked nothing that would change it can be touched. The budget and the switches
+	// stay as readable as ever -- read-only, and a click on a switch ignored -- rather than greyed out
+	// the way a browser draws anything disabled.
 	function lockControls() {
 		var on = !!locked;
-		budgetBox.disabled = on;
+		budgetBox.readOnly = on;
 		refresh.disabled = on;
 		Array.prototype.forEach.call(presets.querySelectorAll('button'), function (b) { b.disabled = on; });
-		Array.prototype.forEach.call(switchBar.querySelectorAll('input'), function (b) { b.disabled = on; });
+		Array.prototype.forEach.call(switchBar.querySelectorAll('input'), function (b) {
+			b.setAttribute('aria-disabled', on ? 'true' : 'false');
+		});
+		switchBar.className = 'cd-switches' + (on ? ' cd-frozen' : '');
 		planBtn.disabled = on || busy;
 		planBtn.textContent = busy ? 'Planning...' : 'Plan';
 		lockBtn.disabled = busy || (!on && !frontier);
-		lockBtn.textContent = on ? 'Unlock' : 'Save this plan';
+		lockBtn.textContent = on ? 'Unlock' : 'Lock';
 		lockBtn.className = 'cd-refresh' + (on ? ' cd-locked' : '');
-		lockSaid.textContent = on ? 'Saved ' + new Date(locked.at).toLocaleString() + ': this page shows this plan, as it was,' +
+		lockSaid.textContent = on ? 'Locked ' + new Date(locked.at).toLocaleString() + ': this page shows this plan, as it was,' +
 			' every time it’s opened, and plans and prices nothing until you unlock it.' : '';
 		if (rollApi) rollApi.lock(on);
 	}
@@ -319,7 +324,7 @@
 	}
 
 	// Everything the page draws about the plan for this budget, in one object: what's drawn now, and
-	// what Save this plan keeps. null if no plan fits.
+	// what Lock keeps. null if no plan fits.
 	function liveView() {
 		var p = P.planFor(frontier, dayBudget(budget));
 		if (!p) return null;
@@ -511,7 +516,7 @@
 		});
 	}
 
-	// Save this plan: the plan on screen and the choices behind it go into a KoLmafia preference, and
+	// Lock: the plan on screen and the choices behind it go into a KoLmafia preference, and
 	// the page shows that until it's unlocked. Unlocking clears it and plans again from those choices.
 	function toggleLock() {
 		lockBtn.disabled = true;
@@ -527,6 +532,7 @@
 			locked = snap;
 			lockControls();
 			if (locked) {
+				root.className = '';
 				status.textContent = '';
 				priceSaid.textContent = '';
 				draw();
@@ -544,7 +550,7 @@
 
 	// --- Shopping ----------------------------------------------------------------------
 	//
-	// The plan on screen (or the saved one) times a number of days, against what you have anywhere
+	// The plan on screen (or the locked one) times a number of days, against what you have anywhere
 	// KoLmafia can see -- inventory, closet, Hagnk's, display case -- and how many more to get. What
 	// you'd cook or mix comes apart into ingredients. Asked again when the plan or the days change and
 	// the tab is showing.
@@ -565,7 +571,7 @@
 
 	function shopSay(list) {
 		shopFrame();
-		document.getElementById('cd-shop-from').textContent = !shown ? '' : (locked ? 'the saved plan' : 'the plan on the' +
+		document.getElementById('cd-shop-from').textContent = !shown ? '' : (locked ? 'the locked plan' : 'the plan on the' +
 			' Diet tab') + ': ' + meat(shown.meat) + ' meat and ' + Math.round(shown.adv) + ' adventures a day' +
 			(shown.feast ? ', a feast day' : '');
 		document.getElementById('cd-shop-note').textContent = 'What you have counts your inventory, closet, Hagnk’s and' +
@@ -665,6 +671,10 @@
 		save();
 		draw();
 	});
+	// a locked plan's switches can't be changed: the click is ignored, so the box never flips
+	switchBar.addEventListener('click', function (e) {
+		if (locked && e.target.getAttribute && e.target.getAttribute('data-k')) e.preventDefault();
+	});
 	switchBar.addEventListener('change', function (e) {
 		var k = e.target.getAttribute('data-k');
 		if (!k || locked) return;
@@ -700,7 +710,7 @@
 	});
 
 	// The data and the rollover catalogue together, so the first plan is on the night's real rollover.
-	// A saved plan is drawn as it was, and nothing is planned.
+	// A locked plan is drawn as it was, and nothing is planned.
 	Promise.all([
 		api('cowl_diet_data.ash', {}),
 		api('cowl_diet_rollover.ash', {}).catch(function () { return null; })
