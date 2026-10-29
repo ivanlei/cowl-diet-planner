@@ -122,6 +122,14 @@ bare.gear = {};
 bare.gibberer = bare.circadian = false;
 assert.strictEqual(R.summary(cat, bare).total, cat.today.total);
 assert.strictEqual(R.summary(cat, bare).clicks, 3 + 5 + 1, 'a calendar, the self-help books and the desk calendar');
+// the etched hourglass: 5 more in the day, none at rollover, and only for someone who has one
+assert.strictEqual(R.summary(cat, bare).hourglass, 0);
+const glass = Object.assign({}, cat, {today: Object.assign({}, cat.today, {hourglass: true})});
+const withGlass = R.initial(glass);
+withGlass.gear = {};
+withGlass.gibberer = withGlass.circadian = false;
+assert.strictEqual(R.summary(glass, withGlass).hourglass, 5);
+assert.strictEqual(R.summary(glass, withGlass).total, cat.today.total, 'not rollover');
 
 // The night's rollover is what a nightcap fits under the cap with.
 assert.strictEqual(plan.buildConfig(data, {rollover: 127, gibberer: false}).nightcapRoom, 73);
