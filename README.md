@@ -16,6 +16,18 @@ It has three tabs:
 Set up the Rollover tab and the Diet tab's budget and switches, then press **Plan**: nothing is
 planned until you do.
 
+## Halloween Treats
+
+A second page, independent of the planner: `relay/relay_Halloween_Treats.ash` lists every outfit you
+can go trick-or-treating in, what it brings back from a door, and what that is worth — each drop's
+chance times its recorded mall price. Sortable, with a box to show only the outfits you own.
+
+The table comes from the fifth column of KoLmafia's own `data/outfits.txt` rather than from the
+wiki, so it stays in step with the game. "Own" counts your display case as well as your inventory,
+closet, storage and clan stash: KoLmafia's `have_outfit` does not look in the museum, and a
+costume collection kept there would otherwise read as owning nothing.
+
+
 ## Install
 
 KoLmafia installs it itself. In the gCLI:
