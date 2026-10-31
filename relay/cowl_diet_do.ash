@@ -799,11 +799,21 @@ int dietFits(dietStep s, int need) {
 
 // Write a row's progress into today's ledger, merging rather than replacing: every other row's
 // count has to survive this one.
-void dietRecord(int i, int did, int gained) {
+void dietRecord(int i, int did, int gained, boolean measured) {
 	int [int] done = dietReadDone();
 	int [int] got = dietReadGained();
 	done[i] = (done contains i ? done[i] : 0) + did;
-	if (gained != 0) got[i] = (got contains i ? got[i] : 0) + gained;
+	// A measured nothing is a measurement. Storing it only when it was not zero made a row that
+	// genuinely gained nothing -- a fudge spork, whose three adventures land on the casserole it is
+	// spent on, or a milk of magnesium, whose five are spread through the food -- look unmeasured,
+	// and the running total then counted the plan's expectation for it instead of the truth. That
+	// is how a morning with 386 adventures in it read as 405.
+	//
+	// measured is false only where a row is recorded by something other than its own execution:
+	// answering a choice left open proves the food went down, but nobody was counting adventures
+	// across the step that stopped, and claiming zero there would be worse than admitting to not
+	// knowing.
+	if (measured) got[i] = (got contains i ? got[i] : 0) + gained;
 	buffer out;
 	out.append(get_property(DIET_STEPS_AT) + ":");
 	int n = 0;
@@ -1060,7 +1070,7 @@ void dietStepAction() {
 		// Whoever's button that was has already eaten: the choice comes after the swallowing. So
 		// the row is recorded as done, which is what stops the morning eating a second one of it.
 		if (dietChoiceOwner >= 0) {
-			dietRecord(dietChoiceOwner, 1, 0);
+			dietRecord(dietChoiceOwner, 1, 0, false);
 			print("  " + dietSayStep(steps[dietChoiceOwner], dietChoiceOwner)
 				+ " had already gone down; its choice was still open, and is now answered.");
 			if (dietChoiceOwner == i) {
@@ -1212,7 +1222,7 @@ void dietStepAction() {
 	}
 
 	int gained = dry ? 0 : my_adventures() - advBefore;
-	if (!dry && didNow > 0) dietRecord(i, didNow, gained);
+	if (!dry && didNow > 0) dietRecord(i, didNow, gained, true);
 
 	if (trouble != "") {
 		dietTrouble(s, i, trouble);
