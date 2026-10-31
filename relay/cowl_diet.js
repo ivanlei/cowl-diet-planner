@@ -621,10 +621,13 @@
 			consumeSay(e.message || 'KoLmafia didn\u2019t answer.', true);
 		});
 	}
-	function organLine(o) {
+	function organLine(o, turns) {
 		return 'Fullness ' + o.fullness[0] + '/' + o.fullness[1] + ' · drunk ' + o.drunk[0] + '/' + o.drunk[1]
 			+ ' · spleen ' + o.spleen[0] + '/' + o.spleen[1] + ' · HP ' + o.hp[0] + '/' + o.hp[1]
-			+ ' · MP ' + o.mp[0] + '/' + o.mp[1];
+			+ ' · MP ' + o.mp[0] + '/' + o.mp[1]
+			// The hourglass itself, beside the table, so the before-and-after columns have the
+			// thing they are meant to be checked against in the same glance.
+			+ (turns === undefined ? '' : ' · ' + turns + ' adventures');
 	}
 
 	// Hand the rows over, then read back where each of them stands. quiet keeps it out of the gCLI,
@@ -725,20 +728,58 @@
 		return num(total) + (n > 1 ? ' <span class="cd-sub-inline">(ave: ' + (Math.round(total / n * 10) / 10) + ')</span>' : '');
 	}
 
+	// The adventure count either side of every step, in the order they happened. Parsed once per
+	// draw: the page is handed the raw thing the script keeps, so there is one copy of it and no
+	// chance of the two disagreeing.
+	function turnLog() {
+		var out = [];
+		String((stepRows && stepRows.log) || '').split(',').forEach(function (e) {
+			if (!e) return;
+			var p = e.split('*');
+			if (p.length === 3) out.push({i: +p[0], before: +p[1], after: +p[2]});
+		});
+		return out;
+	}
+
+	// "403 → 410", per execution, so a row's claim can be checked against the hourglass rather
+	// than believed. A row done over two passes has two of them.
+	function turnsFor(log, i) {
+		var mine = log.filter(function (e) { return e.i === i; });
+		if (!mine.length) return '';
+		return mine.map(function (e) { return e.before + ' \u2192 ' + e.after; }).join(', ');
+	}
+
+	// What happened between the steps. One entry's after should be the next entry's before; where
+	// it is not, something went on that this tab did not do -- a turn adventured, or a step that
+	// stopped before it could count itself. Shown rather than smoothed over, because the whole
+	// point of keeping both numbers is that a gap is a thing you can see.
+	function turnGaps(log) {
+		var out = [];
+		for (var k = 1; k < log.length; k++) {
+			var d = log[k].before - log[k - 1].after;
+			if (d !== 0) out.push({at: log[k].i, by: d, from: log[k - 1].i});
+		}
+		return out;
+	}
+
 	// What a row actually turned into, where it has been carried out and the gain was measured,
 	// against what the plan said it would be. Plans are averages -- a 4-to-5 adventure food is not
 	// 4.5 adventures, it is four or five -- so the two differing is ordinary rather than alarming,
 	// and the running total is the place that difference actually shows.
-	function stepAdv(s) {
+	function stepAdv(s, log) {
 		var r = planRow(s.i);
 		var want = r ? r.adv : null;
 		var html = advText(want, s.count);
-		if (s.gained === undefined || s.gained === null) return html;
-		var got = '<div class="cd-sub cd-ok">got ' + advText(s.gained, s.done || s.count) + '</div>';
-		return (html || '') + got;
+		var turns = turnsFor(log, s.i);
+		if (s.gained !== undefined && s.gained !== null) {
+			html = (html || '') + '<div class="cd-sub cd-ok">got ' + advText(s.gained, s.done || s.count) + '</div>';
+		}
+		// The two numbers the gain was worked out from, so it can be checked rather than believed.
+		if (turns) html = (html || '') + '<div class="cd-sub">' + esc(turns) + '</div>';
+		return html;
 	}
 
-	function stepTable(title, rows, running) {
+	function stepTable(title, rows, running, log) {
 		var html = ['<h2>' + title + '</h2>',
 			'<table class="cd-order cd-steps"><tr><th></th><th>Action</th><th colspan="2">Item</th>'
 				+ '<th>n</th><th>Fullness</th><th>Adventures</th><th>Total</th><th>Where it stands</th></tr>'];
@@ -757,7 +798,7 @@
 				+ '<td class="cd-num">' + (s.done > 0 && s.done < s.count ? s.done + ' of ' + s.count : s.count) + '</td>'
 				+ '<td class="cd-room">' + esc(roomFor(s.i))
 				+ (s.state === 'done' ? ' <span class="cd-ok">\u2713</span>' : '') + '</td>'
-				+ '<td class="cd-num">' + stepAdv(s) + '</td>'
+				+ '<td class="cd-num">' + stepAdv(s, log) + '</td>'
 				+ '<td class="cd-num cd-run">' + running.add(s) + '</td>'
 				+ '<td class="cd-why ' + st[1] + '">' + esc(s.said || st[2]) + '</td></tr>');
 		});
@@ -792,7 +833,7 @@
 
 	function drawConsume(before) {
 		if (!stepRows || !consumeEl) return;
-		var html = ['<div class="cd-day">' + esc(organLine(stepRows.organs)) + '</div>'];
+		var html = ['<div class="cd-day">' + esc(organLine(stepRows.organs, stepRows.turns)) + '</div>'];
 		if (upgraded) {
 			html.push('<p class="cd-said">This plan was locked before this tab existed. Which of its steps come after'
 				+ ' the day’s turns has been read off the notes it carries, and nothing stored has been changed — the'
@@ -805,21 +846,32 @@
 		}
 		// One running total across both tables: the day does not start again after your turns.
 		var running = runningTotal();
+		var log = turnLog();
 		[['start', 'The start of the day'], ['end', 'After the day’s turns']].forEach(function (half) {
 			var rows = stepRows.steps.filter(function (s) { return s.phase === half[0]; });
-			if (rows.length) html.push(stepTable(half[1], rows, running));
+			if (rows.length) html.push(stepTable(half[1], rows, running, log));
 		});
 		consumeEl.innerHTML = html.join('');
 		fetchFacts(stepRows.steps.map(function (s) { return s.name; }));
 		var n = stepRows.steps.length;
 		var done = stepRows.steps.filter(function (s) { return s.state === 'done'; }).length;
+		var gaps = turnGaps(turnLog());
 		var stuck = stepRows.steps.filter(function (s) { return s.state === 'no'; }).length;
 		var yours = stepRows.steps.filter(function (s) { return s.state === 'you'; }).length;
 		var moved = before ? changedSince(before) : '';
+		// A gap is the one thing in this tab nobody has to take on trust, and nobody should: it is
+		// the arithmetic of the hourglass disagreeing with the arithmetic of the plan.
+		var gapSaid = '';
+		if (gaps.length) {
+			var total = gaps.reduce(function (t, g) { return t + g.by; }, 0);
+			gapSaid = ' Between the steps, ' + (total > 0 ? '+' : '') + total + ' adventures went somewhere this'
+				+ ' tab did not put them' + (gaps.length === 1 ? ' (before step ' + (gaps[0].at + 1) + ')'
+					: ' (' + gaps.length + ' places)') + '.';
+		}
 		consumeSay(done + ' of ' + n + ' done'
 			+ (stuck ? '; ' + stuck + (stuck === 1 ? ' step can’t' : ' steps can’t') + ' be done as things stand' : '')
 			+ (yours ? '; ' + yours + ' for you to do by hand' : '') + '.'
-			+ (moved ? ' Checked just now — ' + moved + '.' : ''), stuck > 0);
+			+ (moved ? ' Checked just now — ' + moved + '.' : '') + gapSaid, stuck > 0);
 	}
 
 	function forgetProgress() {
