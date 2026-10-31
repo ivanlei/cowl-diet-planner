@@ -44,6 +44,7 @@ import <cowl_diet_assets.ash>
 string DIET_STEPS = "cowlDietSteps";      // the rows, as records
 string DIET_STEPS_AT = "cowlDietStepsAt"; // the locked plan they came from
 string DIET_DONE = "_cowlDietDone";       // today's progress, cleared at rollover
+string DIET_LOG = "_cowlDietLog";         // the adventure count either side of every step, in order
 
 // Records are separated by "|", fields by "^", and a Cup of 13s' three ingredients by "~". None of
 // the three occurs in the name of any item, skill, effect or familiar KoLmafia knows, which is the
@@ -824,6 +825,32 @@ void dietRecord(int i, int did, int gained, boolean measured) {
 	set_property(DIET_DONE, out.to_string());
 }
 
+// Every step's adventure count, before it and after it, in the order they happened.
+//
+// The difference is what a step was worth, but the two numbers are worth more than the difference:
+// they can be checked against the hourglass, and read one after another they show what happened
+// BETWEEN the steps as well as in them. A step this script could not count -- one that stopped
+// inside a choice, or a turn spent adventuring halfway through the morning -- shows up as one
+// entry's after not matching the next entry's before, which is a gap you can see rather than a
+// number you have to take on trust.
+//
+// i*before*after, comma separated, keyed to the plan like the ledger so that re-locking cannot
+// leave yesterday's numbers lying against today's rows.
+void dietLogStep(int i, int before, int after) {
+	string had = get_property(DIET_LOG);
+	string at = get_property(DIET_STEPS_AT);
+	int colon = had.index_of(":");
+	string body = (colon >= 0 && had.substring(0, colon) == at) ? had.substring(colon + 1) : "";
+	set_property(DIET_LOG, at + ":" + body + (body == "" ? "" : ",") + i + "*" + before + "*" + after);
+}
+
+string dietLogBody() {
+	string had = get_property(DIET_LOG);
+	int colon = had.index_of(":");
+	if (colon < 0 || had.substring(0, colon) != get_property(DIET_STEPS_AT)) return "";
+	return had.substring(colon + 1);
+}
+
 string dietSayStep(dietStep s, int i) {
 	return "step " + (i + 1) + ": " + s.action + " "
 		+ (s.count > 1 ? s.count + " x " : "") + dietPlain(s.name);
@@ -1222,7 +1249,10 @@ void dietStepAction() {
 	}
 
 	int gained = dry ? 0 : my_adventures() - advBefore;
-	if (!dry && didNow > 0) dietRecord(i, didNow, gained, true);
+	if (!dry && didNow > 0) {
+		dietRecord(i, didNow, gained, true);
+		dietLogStep(i, advBefore, my_adventures());
+	}
 
 	if (trouble != "") {
 		dietTrouble(s, i, trouble);
@@ -1241,6 +1271,7 @@ void dietCheck() {
 	dietStep [int] steps = dietReadSteps();
 	buffer out;
 	out.append("{\"ok\":true,\"at\":" + dietQuoted(get_property(DIET_STEPS_AT))
+		+ ",\"turns\":" + my_adventures() + ",\"log\":" + dietQuoted(dietLogBody())
 		+ ",\"ledger\":" + dietQuoted(dietDoneState())
 		+ ",\"organs\":" + dietOrgansJSON() + ",\"steps\":[");
 	int [int] done = dietReadDone();
@@ -1277,6 +1308,7 @@ void main() {
 		dietOpen();
 	} else if (action == "reset") {
 		set_property(DIET_DONE, "");
+		set_property(DIET_LOG, "");
 		print("Diet Planner: today's progress forgotten; nothing was eaten or undone.", "blue");
 		write("{\"ok\":true}");
 	} else if (action == "step") {
