@@ -842,6 +842,10 @@
 		return m ? m[1].split(' + ') : [];
 	}
 
+	// The one effect this planner ever buys with a wish. Named once, because the row has to carry
+	// it and a plan saved before the row did has to be given it back.
+	var PALATE = 'Refined Palate';
+
 	// What the drink that spends the Stooper's point has to say, wherever it comes from.
 	var STOOPER_NOTE = 'before your last turns: put the Stooper out, drink it, and play them with it still out';
 
@@ -895,8 +899,13 @@
 		if (cfg.tuxedo && martinis) info('equip', 'tuxedo shirt', 'item', 'martinis +2, counted in the martinis');
 		take(function (u) { return u[1] === 'effect'; }).forEach(function (e) {
 			var brie = e[0][0] === 'toasted brie';
-			add(brie ? 'eat' : 'use', e[0], e[1], brie ? 'for Refined Palate: wine +25%, counted in the wines'
-				: 'wish for Refined Palate: wine +25%, counted in the wines');
+			// The wished-for effect goes on the row. It used to live only in the sentence below,
+			// which is why carrying the plan out handed this step back to the player: a script
+			// cannot wish for prose.
+			add(brie ? 'eat' : 'use', e[0], e[1],
+				brie ? 'for ' + PALATE + ': wine +25%, counted in the wines'
+					: 'wish for ' + PALATE + ': wine +25%, counted in the wines',
+				brie ? {} : {wish: PALATE});
 		});
 		// first drinks: a morning drink doubled by last night's yeti charge, then the shotglass
 		var morning = take(function (u) { return u[1] === 'liver' && u[0].indexOf('[yeti]') >= 0; });
@@ -1256,6 +1265,15 @@
 			return {ok: false, why: 'the steps that come after the day’s turns aren’t the last ones'};
 		}
 		if (stooper) out = keepCupForStooper(out);
+		// A plan saved before rows carried the wish: this planner only ever wishes for one thing,
+		// so giving it back is naming a constant rather than reading the note's prose.
+		out = out.map(function (r) {
+			if (r.name !== 'pocket wish' || r.wish) return r;
+			var up = {};
+			Object.keys(r).forEach(function (k) { up[k] = r[k]; });
+			up.wish = PALATE;
+			return up;
+		});
 		var cup = out.filter(function (r) { return r.name === 'Cup of 13s'; })[0];
 		return {ok: true, rows: out,
 			why: cup && !(cup.mix && cup.mix.length) ? 'the Cup of 13s row doesn’t say what to mix' : ''};
@@ -1282,7 +1300,9 @@
 		if (r.nightcap) flags.push('nightcap');
 		if (r.stooper) flags.push('stooper');
 		return [r.phase || 'start', r.action, r.kind, r.name, r.count, flags.join(','),
-			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2]].join('^');
+			// "0" rather than empty for a row that wishes for nothing: a trailing empty field is
+			// dropped by the split at the other end, and the record then arrives one short.
+			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2], r.wish || '0'].join('^');
 	}
 
 	function stepList(rows) {
