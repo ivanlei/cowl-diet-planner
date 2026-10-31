@@ -82,6 +82,10 @@ record dietStep {
 	int full;
 	int drunk;
 	int spleen;
+	// The effect a wish buys, as KoLmafia numbers it, or 0 for a row that wishes for nothing. A
+	// wish needs a target and prose is not one; this is that target, resolved the same way and at
+	// the same moment as everything else.
+	int wish;
 };
 
 record dietVerdict {
@@ -139,9 +143,19 @@ string dietResolve(string handed, buffer trouble) {
 	foreach i, rec in handed.split_string("\\|") {
 		if (rec == "") continue;
 		string [int] f = rec.split_string("\\^");
-		if (count(f) < 10) {
+		if (count(f) < 11) {
 			trouble.append((trouble.length() > 0 ? "; " : "") + "a step arrived with " + count(f) + " fields");
 			return "";
+		}
+		// The wished-for effect goes the same way as everything else: a name once, a number after.
+		int wish = 0;
+		if (f[10] != "" && f[10] != "0") {
+			effect want = f[10].to_effect();
+			if (want == $effect[none]) {
+				trouble.append((trouble.length() > 0 ? "; " : "") + "KoLmafia has no effect called \"" + f[10] + "\"");
+				return "";
+			}
+			wish = want.to_int();
 		}
 		int id = dietIdOf(f[2], f[3]);
 		if (id < 1) {
@@ -164,7 +178,7 @@ string dietResolve(string handed, buffer trouble) {
 		if (out.length() > 0) out.append(STEP_SEP);
 		out.append(f[0] + FIELD_SEP + f[1] + FIELD_SEP + f[2] + FIELD_SEP + f[3] + FIELD_SEP + f[4]
 			+ FIELD_SEP + f[5] + FIELD_SEP + mix.to_string() + FIELD_SEP + f[7] + FIELD_SEP + f[8]
-			+ FIELD_SEP + f[9] + FIELD_SEP + id);
+			+ FIELD_SEP + f[9] + FIELD_SEP + id + FIELD_SEP + wish);
 	}
 	return out.to_string();
 }
@@ -178,15 +192,15 @@ dietStep [int] dietReadSteps() {
 	foreach i, rec in kept.split_string("\\|") {
 		if (rec == "") continue;
 		string [int] f = rec.split_string("\\^");
-		// Eleven fields, because the kept records carry the resolved id that the ones handed over
-		// do not. A shorter record is one this script wrote before that was true: dropped rather
-		// than read, since the page hands the plan over again on every visit to the tab.
-		if (count(f) < 11) continue;
+		// Twelve fields, because the kept records carry the resolved numbers that the ones handed
+		// over do not. A shorter record is one this script wrote before that was true: dropped
+		// rather than read, since the page hands the plan over again on every visit to the tab.
+		if (count(f) < 12) continue;
 		// The flags field is a list, not a word: a drink can be both the nightcap and the one the
 		// Stooper's point is spent by, and on a day with no Cup it often is.
 		steps[count(steps)] = new dietStep(f[0], f[1], f[2], f[3], f[10].to_int(), f[4].to_int(),
 			f[5].contains_text("nightcap"), f[5].contains_text("stooper"), f[6],
-			f[7].to_int(), f[8].to_int(), f[9].to_int());
+			f[7].to_int(), f[8].to_int(), f[9].to_int(), f[11].to_int());
 	}
 	return steps;
 }
@@ -428,10 +442,22 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 	// rather than on the plan.
 	if (it == $item[none]) return new dietVerdict("no", "the kept plan has no item for this row");
 
-	// A wish's target is not in the row -- only the effect's name, in prose, in the note -- and
-	// guessing what to wish for with a charge that costs real meat is not a thing to automate.
+	// A wish with a target on the row is a thing this can do: KoLmafia's own genie command takes
+	// the effect by name and reaches for a pocket wish when there is no bottle to rub. Without a
+	// target it is still yours -- wishing for prose is not a thing -- but the plan says what it
+	// wants now, so that is the unusual case rather than the only one.
 	if (it == $item[pocket wish]) {
-		return new dietVerdict("you", "make the wish yourself, then mark this done");
+		if (s.wish < 1) return new dietVerdict("you", "the plan doesn't say what to wish for");
+		effect want = s.wish.to_effect();
+		if (have_effect(want) > 0) {
+			return new dietVerdict("done", "you already have " + want + " for " + have_effect(want) + " turns");
+		}
+		if (it.item_amount() < 1) {
+			string where = dietWhereElse(it);
+			return new dietVerdict(dietFetchable(it) > 0 ? "held" : "no",
+				where == "" ? "you have no pocket wish" : "none to hand: " + where);
+		}
+		return new dietVerdict("ready", "wish to be " + want);
 	}
 
 	if (s.action == "equip") {
@@ -1016,7 +1042,19 @@ void dietStepAction() {
 		if (trouble == "") didNow = 1;
 	} else {
 		item it = s.id.to_item();
-		if (it == $item[Cup of 13s]) {
+		if (it == $item[pocket wish] && s.wish > 0) {
+			effect want = s.wish.to_effect();
+			if (dry) {
+				print("  would wish to be " + want);
+				didNow = 1;
+			} else {
+				// KoLmafia's own command, which knows the wording KoL wants ("to be <effect>") and
+				// which reaches for a pocket wish when there is no genie bottle in inventory.
+				cli_execute("genie effect " + want);
+				if (have_effect(want) < 1) trouble = "wished to be " + want + " and the effect is not up";
+				else didNow = 1;
+			}
+		} else if (it == $item[Cup of 13s]) {
 			string said = dietDrinkTheCup(s, dry);
 			if (dry) print("  " + said);
 			else if (said != "") trouble = said;
