@@ -119,6 +119,52 @@ assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the mo
 	assert.ok(/doesn.t say what to mix/.test(upAmbiguous.why), 'and it says so');
 }
 
+// The Stooper's point of liver has to be spent by the last drink of the day. Spending it earlier
+// leaves you over your limit for everything after, which is not a smaller day but no day at all:
+// you cannot adventure falling-down drunk and KoL will not start another drink either. The
+// keep-back only ever looked at the liver group, so a day whose one 1-drunk drink is the Cup of
+// 13s -- which isn't booze and isn't in that group -- counted the point and never said to put the
+// Stooper out.
+{
+	const noOnes = JSON.parse(JSON.stringify(data));
+	noOnes.account.cup = true;
+	noOnes.account.shotglass = false;  // the shotglass drink is the other way to be 1 drunk
+	noOnes.cup = {gems: 13, tiers: {5: [{name: 'porquoise', price: 400}], 3: [{name: 'hamethyst', price: 150}]}};
+	noOnes.menu = noOnes.menu.filter(x => !(x.organ === 'liver' && x.size === 1));
+	const cfgS = plan.buildConfig(noOnes, {stooper: true, nightcap: true});
+	const rowsS = plan.dayRows(plan.planFor(plan.sweep(cfgS), 500000)[2], cfgS);
+	const cupS = rowsS.find(r => r.name === 'Cup of 13s');
+	assert.ok(cupS, 'the Cup is in this plan');
+	assert.strictEqual(cupS.phase, 'end', 'and it is kept back for the Stooper');
+	assert.ok(/Stooper out/.test(cupS.note), 'and says to put the Stooper out');
+	assert.ok(/with the Stooper out/.test(rowsS.find(r => r.nightcap).note),
+		'the nightcap needs it out too, or it is refused for being too drunk');
+	// the drink that spends the point must be the last one before the nightcap
+	const drinks = rowsS.filter(r => r.room[1] > 0);
+	assert.strictEqual(drinks[drinks.length - 2].name, 'Cup of 13s', 'last drink before the nightcap');
+
+	// A saved plan with the same hole is repaired without re-planning: the same rows, the same
+	// adventures and the same meat, with the Cup moved to where a drink spending that point has
+	// to be.
+	const holed = {rows: rowsS.map(r => Object.assign({}, r)), night: {nightcap: {name: rowsS.find(r => r.nightcap).name}, stooper: null}};
+	holed.rows.forEach(r => {
+		if (r.name === 'Cup of 13s') { r.phase = 'start'; r.note = r.note.replace(/; before your last turns.*$/, ''); }
+		if (r.nightcap) r.note = r.note.replace('; with the Stooper out', '');
+	});
+	const fixed = plan.upgradeRows(holed.rows, holed.night, {}, true);
+	assert.ok(fixed.ok, fixed.why);
+	assert.strictEqual(fixed.rows.length, holed.rows.length, 'no row gained or lost');
+	assert.ok(Math.abs(fixed.rows.reduce((s, r) => s + (r.adv || 0), 0) - holed.rows.reduce((s, r) => s + (r.adv || 0), 0)) < 1e-9,
+		'the same adventures');
+	assert.ok(Math.abs(fixed.rows.reduce((s, r) => s + r.cost, 0) - holed.rows.reduce((s, r) => s + r.cost, 0)) < 1e-9,
+		'for the same meat');
+	assert.strictEqual(fixed.rows.find(r => r.name === 'Cup of 13s').phase, 'end');
+	assert.ok(/Stooper out/.test(fixed.rows.find(r => r.name === 'Cup of 13s').note));
+	// and a plan that already keeps a drink back is left alone
+	const already = plan.upgradeRows(rowsS.map(r => Object.assign({}, r)), holed.night, {}, true);
+	assert.deepStrictEqual(already.rows.map(r => r.name), rowsS.map(r => r.name), 'nothing moved twice');
+}
+
 // Handing a plan to cowl_diet_do.ash: one record per step, "^" between fields and "|" between
 // steps, in the order that script reads them. Pinned because the two have to agree exactly, and a
 // field slipping a place would have it eating the wrong row.
