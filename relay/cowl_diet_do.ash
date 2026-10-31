@@ -741,6 +741,327 @@ void dietSupplies() {
 	out.write();
 }
 
+// --- carrying one row out ---------------------------------------------------
+//
+// One row per request, because that is what makes the table tick off in front of you and what
+// makes a failure stop where it happened rather than three steps later. The page walks the rows;
+// this does exactly one of them and says what became of it.
+
+// How many of a row can go down right now. A row's own organ, read from the game rather than from
+// the plan's arithmetic, because by the time it runs the organ holds whatever is actually in it.
+int dietFits(dietStep s, int need) {
+	if (s.nightcap) return 1;
+	int organ = s.action == "eat" ? 0 : (s.action == "chew" ? 2 : (s.action == "drink" ? 1 : -1));
+	if (organ < 0) return need;
+	int per = dietRoomPer(s, organ);
+	if (per < 1) return need;
+	int left = organ == 0 ? fullness_limit() - my_fullness()
+		: (organ == 1 ? inebriety_limit() - my_inebriety() : spleen_limit() - my_spleen_use());
+	int fits = left / per;
+	return fits < need ? fits : need;
+}
+
+// Write a row's progress into today's ledger, merging rather than replacing: every other row's
+// count has to survive this one.
+void dietRecord(int i, int did, int gained) {
+	int [int] done = dietReadDone();
+	int [int] got = dietReadGained();
+	done[i] = (done contains i ? done[i] : 0) + did;
+	if (gained != 0) got[i] = (got contains i ? got[i] : 0) + gained;
+	buffer out;
+	out.append(get_property(DIET_STEPS_AT) + ":");
+	int n = 0;
+	foreach j, k in done {
+		if (n++ > 0) out.append(",");
+		out.append(j + "*" + k + (got contains j ? "*" + got[j] : ""));
+	}
+	set_property(DIET_DONE, out.to_string());
+}
+
+string dietSayStep(dietStep s, int i) {
+	return "step " + (i + 1) + ": " + s.action + " "
+		+ (s.count > 1 ? s.count + " x " : "") + dietPlain(s.name);
+}
+
+// What went wrong, at length, with everything that bears on it. This is the one place in the
+// script where being long-winded is the point: a step that failed halfway is a day that has to be
+// picked up by hand, and the gCLI is where that is done from.
+void dietTrouble(dietStep s, int i, string said) {
+	print("");
+	print("Diet Planner: " + dietSayStep(s, i) + " did not go through.", "red");
+	print("  " + said, "red");
+	print("  item " + s.id + ", " + s.count + " wanted, " + s.full + "/" + s.drunk + "/" + s.spleen
+		+ " fullness/drunk/spleen for all of them");
+	print("  organs now: " + my_fullness() + "/" + fullness_limit() + " full, " + my_inebriety() + "/"
+		+ inebriety_limit() + " drunk, " + my_spleen_use() + "/" + spleen_limit() + " spleen");
+	print("  HP " + my_hp() + "/" + my_maxhp() + ", MP " + my_mp() + "/" + my_maxmp()
+		+ ", " + my_adventures() + " adventures, familiar " + my_familiar());
+	print("  _porkElfToiletUsed=" + get_property("_porkElfToiletUsed")
+		+ " coolerYetiMode=" + get_property("coolerYetiMode")
+		+ " _cupOf13sJewels=" + get_property("_cupOf13sJewels")
+		+ " timesRested=" + get_property("timesRested") + "/" + total_free_rests());
+	print("  ledger: " + get_property(DIET_DONE));
+}
+
+// --- the awkward ones -------------------------------------------------------
+
+// Rest at the campsite for the Pork Elf toilet's point of fullness.
+//
+// KoL will not rest somebody who needs nothing, and KoLmafia will not even ask: full HP, full MP
+// and not Beaten Up is a refusal on both sides. So a little MP has to go first, and on any day
+// with drinks in it the plan's own Ode cast is already that spend -- which is why it is tried
+// before anything bought or improvised. cowlDietRestBurn names a fallback for a day with no Ode
+// in it.
+string dietRestForToilet(boolean dry) {
+	if (get_property("_porkElfToiletUsed").to_boolean()) return "the toilet had already digested today";
+	if (my_fullness() < 2) return "it wants 2 fullness and you have " + my_fullness();
+
+	if (my_hp() == my_maxhp() && my_mp() == my_maxmp()) {
+		skill burn = $skill[none];
+		if (have_skill($skill[The Ode to Booze]) && mp_cost($skill[The Ode to Booze]) <= my_mp()) {
+			burn = $skill[The Ode to Booze];
+		} else {
+			skill named = get_property("cowlDietRestBurn").to_skill();
+			if (named != $skill[none] && have_skill(named) && mp_cost(named) <= my_mp()) burn = named;
+		}
+		if (burn == $skill[none]) {
+			return "HP and MP are both full, so a rest would be refused, and there is nothing to spend "
+				+ "MP on: set cowlDietRestBurn to a buff you know";
+		}
+		if (dry) {
+			print("  would cast " + burn + " first: a rest is refused at full HP and MP");
+		} else {
+			print("  casting " + burn + " first: a rest is refused at full HP and MP");
+			use_skill(1, burn);
+			if (my_mp() == my_maxmp()) return "cast " + burn + " and MP is still full";
+		}
+	}
+
+	int free = total_free_rests() - get_property("timesRested").to_int();
+	if (dry) {
+		print("  would rest at the campsite (" + (free > 0 ? free + " free rests left" : "no free rests, so an adventure")
+			+ ")");
+		return "";
+	}
+	cli_execute(free > 0 ? "rest free campground 1" : "rest campground 1");
+	if (!get_property("_porkElfToiletUsed").to_boolean()) {
+		return "rested, but KoLmafia did not see the toilet digest -- _porkElfToiletUsed is still false";
+	}
+	return "";
+}
+
+// Mix and drink a Cup of 13s, taking the Cup off first if it is being worn.
+//
+// The Cup is opened by a link on the inventory page, so a worn Cup is one the link is not beside.
+// It goes back on the moment the drink is down -- and on every way out of here, since leaving
+// somebody with an empty off-hand and no idea why is not a failure mode worth having.
+string dietDrinkTheCup(dietStep s, boolean dry) {
+	item cup = $item[Cup of 13s];
+	slot worn = dietCupSlot();
+	if (dry) {
+		return "would " + (worn == $slot[none] ? "" : "take the Cup off your " + worn + ", ")
+			+ "mix " + dietMixNames(s.mix) + " and drink it"
+			+ (worn == $slot[none] ? "" : ", then put the Cup back");
+	}
+	if (worn != $slot[none]) {
+		equip(worn, $item[none]);
+		if (cup.item_amount() < 1) return "could not take the Cup off your " + worn;
+		print("  took the Cup of 13s off your " + worn);
+	}
+	int before = my_inebriety();
+	// Its own action on the inventory page rather than inv_use.php: the Cup is an off-hand, not a
+	// usable item, so there is no whichitem to use. A plain request rather than use(), because an
+	// automated request landing on a choice aborts instead of handing back a page.
+	visit_url("inventory.php?pwd=" + my_hash() + "&action=cupof13s");
+	if (!handling_choice()) {
+		if (worn != $slot[none]) equip(worn, cup);
+		return "the Cup of 13s did not open";
+	}
+	// By label rather than by number, and asked of KoLmafia rather than scraped off the page.
+	int mixIt = 0;
+	foreach option, says in available_choice_options(true) {
+		if (mixIt == 0 && says.contains_text("Mix")) mixIt = option;
+	}
+	if (mixIt == 0) {
+		string saw;
+		foreach option, says in available_choice_options(true) saw += (saw == "" ? "" : "; ") + option + ") " + says;
+		if (handling_choice()) run_choice(1);
+		if (worn != $slot[none]) equip(worn, cup);
+		return "no button on the Cup looked like mixing a drink; it offered: " + saw;
+	}
+	string [int] mix = s.mix.split_string(MIX_SEP);
+	if (count(mix) != 3) {
+		if (handling_choice()) run_choice(1);
+		if (worn != $slot[none]) equip(worn, cup);
+		return "the plan names " + count(mix) + " things to mix and the Cup takes three";
+	}
+	// whichitem1..3 are the fields KoLmafia reads back off this choice, so they are what it wants.
+	run_choice(mixIt, "whichitem1=" + mix[0] + "&whichitem2=" + mix[1] + "&whichitem3=" + mix[2]);
+	if (handling_choice()) run_choice(1);
+	if (worn != $slot[none]) {
+		equip(worn, cup);
+		if (cup.equipped_amount() > 0) print("  put the Cup of 13s back on your " + worn);
+		else print("  could NOT put the Cup of 13s back on your " + worn + "; it is in your inventory.", "red");
+	}
+	if (my_inebriety() <= before) return "the Cup did not make a drink -- drunkenness did not move from " + before;
+	return "";
+}
+
+// Take a familiar out, and for the Cooler Yeti ask it for the thing worth asking for.
+string dietFamiliarStep(dietStep s, boolean dry) {
+	familiar fam = s.id.to_familiar();
+	if (fam == $familiar[none]) return "the kept plan has no familiar for this row";
+	if (!have_familiar(fam)) return "you don't have a " + fam;
+	boolean yeti = fam == $familiar[Cooler Yeti];
+	if (dry) {
+		return "would take out the " + fam + (yeti ? " and ask for impossibly cold" : "");
+	}
+	if (my_familiar() != fam) {
+		use_familiar(fam);
+		if (my_familiar() != fam) return "could not take out the " + fam;
+	}
+	if (!yeti) return "";
+	if (get_property("_coolerYetiAdventures").to_boolean()) return "";
+	// The conversation is a link on the charpane, and a GET: one-argument visit_url posts, and
+	// main.php's side doors do not read a body.
+	visit_url("main.php?talktoyeti=1", false);
+	if (!handling_choice()) return "the Cooler Yeti did not want to talk";
+	int cold = 0;
+	foreach option, says in available_choice_options(true) {
+		if (cold == 0 && says.contains_text("impossibly cold")) cold = option;
+	}
+	if (cold == 0) {
+		string saw;
+		foreach option, says in available_choice_options(true) saw += (saw == "" ? "" : "; ") + option + ") " + says;
+		if (handling_choice()) run_choice(1);
+		return "the Cooler Yeti did not offer impossibly cold; it offered: " + saw;
+	}
+	run_choice(cold);
+	if (handling_choice()) run_choice(1);
+	if (get_property("coolerYetiMode") != "adventures") {
+		return "asked for impossibly cold but coolerYetiMode is '" + get_property("coolerYetiMode") + "'";
+	}
+	return "";
+}
+
+void dietStepAction() {
+	dietStep [int] steps = dietReadSteps();
+	int i = form_field("i").to_int();
+	if (count(steps) == 0 || i < 0 || i >= count(steps)) {
+		write("{\"ok\":false,\"error\":\"No such step. Reload the page.\"}");
+		return;
+	}
+	boolean dry = form_field("dry") == "1";
+	dietStep s = steps[i];
+	int [int] done = dietReadDone();
+	int did = done contains i ? done[i] : 0;
+	int need = s.count - did;
+	dietVerdict v = dietJudge(s, did, dietDrunkToCome(steps, done));
+
+	// The overdrink needs asking for by name. Breakfast walks the same endpoint, and a stray index
+	// must not be able to end the day.
+	if (s.nightcap && form_field("cap") != "1") {
+		write("{\"ok\":false,\"error\":\"That step is the nightcap, which has to be asked for on its own.\"}");
+		return;
+	}
+	if (v.state == "done") {
+		write("{\"ok\":true,\"did\":0,\"state\":\"done\",\"said\":" + dietQuoted(v.said) + "}");
+		return;
+	}
+	// Not ready is not a failure, it is a "not yet": a cleaner has not freed the organ, or the
+	// fullness the toilet wants is not in you yet. The walk has to be able to step over those and
+	// come back, so they are answered as nothing done rather than as something wrong.
+	if (v.state != "ready" && v.state != "part") {
+		write("{\"ok\":true,\"did\":0,\"skipped\":true,\"state\":" + dietQuoted(v.state)
+			+ ",\"said\":" + dietQuoted(v.said) + "}");
+		return;
+	}
+
+	int advBefore = my_adventures();
+	string trouble;
+	int didNow = 0;
+
+	if (s.kind == "skill") {
+		skill sk = s.id.to_skill();
+		int toCome = dietDrunkToCome(steps, done);
+		int per = turns_per_cast(sk);
+		int casts = sk == $skill[The Ode to Booze] && per > 0
+			? (toCome - have_effect($effect[Ode to Booze]) + per - 1) / per : 1;
+		if (casts < 1) casts = 1;
+		if (dry) {
+			print("  would cast " + casts + " x " + sk);
+		} else {
+			use_skill(casts, sk);
+			if (sk == $skill[The Ode to Booze] && have_effect($effect[Ode to Booze]) < toCome) {
+				trouble = "the Ode is " + have_effect($effect[Ode to Booze]) + " turns and the day spends " + toCome;
+			}
+		}
+		if (trouble == "") didNow = 1;
+	} else if (s.kind == "familiar") {
+		string said = dietFamiliarStep(s, dry);
+		if (dry) print("  " + said);
+		else if (said != "") trouble = said;
+		if (trouble == "") didNow = 1;
+	} else if (s.kind == "campground") {
+		string said = dietRestForToilet(dry);
+		if (said != "") trouble = said;
+		if (trouble == "") didNow = 1;
+	} else if (s.action == "equip") {
+		item it = s.id.to_item();
+		if (dry) print("  would wear the " + it);
+		else {
+			equip(it);
+			if (it.equipped_amount() < 1) trouble = "could not wear the " + dietPlain(it.to_string());
+		}
+		if (trouble == "") didNow = 1;
+	} else {
+		item it = s.id.to_item();
+		if (it == $item[Cup of 13s]) {
+			string said = dietDrinkTheCup(s, dry);
+			if (dry) print("  " + said);
+			else if (said != "") trouble = said;
+			if (trouble == "") didNow = 1;
+		} else {
+			int n = dietFits(s, need);
+			if (n < 1) {
+				write("{\"ok\":true,\"did\":0,\"skipped\":true,\"state\":\"held\",\"said\":"
+					+ dietQuoted("none of it fits yet: " + v.said) + "}");
+				return;
+			}
+			if (dry) {
+				print("  would " + s.action + " " + n + " x " + dietPlain(it.to_string()));
+				didNow = n;
+			} else {
+				int had = it.item_amount();
+				// Counted off the inventory afterwards rather than off what the call returned:
+				// three of five going down is a thing to record as three, not as a failure.
+				if (s.nightcap) overdrink(1, it);
+				else if (s.action == "eat") eat(n, it);
+				else if (s.action == "drink") drink(n, it);
+				else if (s.action == "chew") chew(n, it);
+				else use(n, it);
+				didNow = had - it.item_amount();
+				if (didNow < 1) trouble = "nothing went down -- you still have " + it.item_amount();
+			}
+		}
+	}
+
+	int gained = dry ? 0 : my_adventures() - advBefore;
+	if (!dry && didNow > 0) dietRecord(i, didNow, gained);
+
+	if (trouble != "") {
+		dietTrouble(s, i, trouble);
+		write("{\"ok\":false,\"error\":" + dietQuoted(trouble) + ",\"did\":" + didNow + "}");
+		return;
+	}
+	print("  " + (dry ? "[dry] " : "") + dietSayStep(s, i) + " -- " + (dry ? "would do " : "did ") + didNow
+		+ (gained != 0 ? ", " + gained + " adventures" : "")
+		+ " (" + my_fullness() + "/" + fullness_limit() + " full, " + my_inebriety() + "/" + inebriety_limit()
+		+ " drunk, " + my_spleen_use() + "/" + spleen_limit() + " spleen)");
+	write("{\"ok\":true,\"did\":" + didNow + ",\"gained\":" + gained + ",\"dry\":" + dry
+		+ ",\"left\":" + (need - didNow) + ",\"organs\":" + dietOrgansJSON() + "}");
+}
+
 void dietCheck() {
 	dietStep [int] steps = dietReadSteps();
 	buffer out;
@@ -783,6 +1104,8 @@ void main() {
 		set_property(DIET_DONE, "");
 		print("Diet Planner: today's progress forgotten; nothing was eaten or undone.", "blue");
 		write("{\"ok\":true}");
+	} else if (action == "step") {
+		dietStepAction();
 	} else if (action == "supplies") {
 		dietSupplies();
 	} else if (action == "check" || action == "") {

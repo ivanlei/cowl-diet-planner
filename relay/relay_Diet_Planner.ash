@@ -67,6 +67,7 @@ void main() {
 	out.append("<div class='cd-controls'>\n");
 	out.append("<button type='button' class='cd-refresh cd-go' id='cd-consume-check'>Check again</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-consume-grab'>Grab supplies</button>\n");
+	out.append("<button type='button' class='cd-refresh' id='cd-consume-breakfast'>Breakfast</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-consume-forget'>Forget today’s progress</button>\n");
 	out.append("</div>\n");
 	out.append("<div id='cd-consume-said' class='cd-said cd-consume-said'></div>\n");
@@ -80,8 +81,13 @@ void main() {
 	out.append("<p class='cd-note'><b>Grab supplies</b> takes what the rest of the plan still needs out of your display"
 		+ " case shelf, then your closet, then Hagnk's when pulls are free \u2014 for what is left to do, so a day half"
 		+ " eaten doesn't fetch twice. It never buys anything and never touches the clan stash. The first press says what"
-		+ " it would fetch and moves nothing; the button then reads <b>Fetch them</b>, and that press does it. Nothing on"
-		+ " this tab eats, drinks or casts anything yet.</p>\n");
+		+ " it would fetch and moves nothing; the button then reads <b>Fetch them</b>, and that press does it.</p>\n");
+	out.append("<p class='cd-note'><b>Breakfast</b> carries out the start of the day, in order, stopping at the first"
+		+ " step that goes wrong. It goes round more than once on purpose: the eighth casserole only fits after the"
+		+ " toilet frees a point of fullness, and the last smoke patches only after the mojo filters free some spleen,"
+		+ " so a step that doesn't fit yet is stepped over and come back to. Like Grab supplies, the first press is a"
+		+ " dry run and the second does it. It never drinks the nightcap \u2014 that is a button of its own, still to"
+		+ " come.</p>\n");
 	out.append("</div>\n");
 	out.append("</div>\n");
 
