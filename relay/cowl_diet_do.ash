@@ -86,6 +86,10 @@ record dietStep {
 	// wish needs a target and prose is not one; this is that target, resolved the same way and at
 	// the same moment as everything else.
 	int wish;
+	// The words on the button to press when KoL puts a choice in front of you after this row. A
+	// legendary noodle dish asks how to digest it and KoLmafia has no table for that one, so
+	// without this the morning stops inside the choice.
+	string pick;
 };
 
 record dietVerdict {
@@ -143,7 +147,7 @@ string dietResolve(string handed, buffer trouble) {
 	foreach i, rec in handed.split_string("\\|") {
 		if (rec == "") continue;
 		string [int] f = rec.split_string("\\^");
-		if (count(f) < 11) {
+		if (count(f) < 12) {
 			trouble.append((trouble.length() > 0 ? "; " : "") + "a step arrived with " + count(f) + " fields");
 			return "";
 		}
@@ -178,7 +182,7 @@ string dietResolve(string handed, buffer trouble) {
 		if (out.length() > 0) out.append(STEP_SEP);
 		out.append(f[0] + FIELD_SEP + f[1] + FIELD_SEP + f[2] + FIELD_SEP + f[3] + FIELD_SEP + f[4]
 			+ FIELD_SEP + f[5] + FIELD_SEP + mix.to_string() + FIELD_SEP + f[7] + FIELD_SEP + f[8]
-			+ FIELD_SEP + f[9] + FIELD_SEP + id + FIELD_SEP + wish);
+			+ FIELD_SEP + f[9] + FIELD_SEP + id + FIELD_SEP + wish + FIELD_SEP + f[11]);
 	}
 	return out.to_string();
 }
@@ -192,15 +196,16 @@ dietStep [int] dietReadSteps() {
 	foreach i, rec in kept.split_string("\\|") {
 		if (rec == "") continue;
 		string [int] f = rec.split_string("\\^");
-		// Twelve fields, because the kept records carry the resolved numbers that the ones handed
+		// Thirteen fields, because the kept records carry the resolved numbers that the ones handed
 		// over do not. A shorter record is one this script wrote before that was true: dropped
 		// rather than read, since the page hands the plan over again on every visit to the tab.
-		if (count(f) < 12) continue;
+		if (count(f) < 13) continue;
 		// The flags field is a list, not a word: a drink can be both the nightcap and the one the
 		// Stooper's point is spent by, and on a day with no Cup it often is.
 		steps[count(steps)] = new dietStep(f[0], f[1], f[2], f[3], f[10].to_int(), f[4].to_int(),
 			f[5].contains_text("nightcap"), f[5].contains_text("stooper"), f[6],
-			f[7].to_int(), f[8].to_int(), f[9].to_int(), f[11].to_int());
+			f[7].to_int(), f[8].to_int(), f[9].to_int(), f[11].to_int(),
+			f[12] == "0" ? "" : f[12]);
 	}
 	return steps;
 }
@@ -834,6 +839,64 @@ void dietTrouble(dietStep s, int i, string said) {
 	print("  ledger: " + get_property(DIET_DONE));
 }
 
+// Answer a choice KoL is holding us in, by the words on the button.
+//
+// By label, never by number: the numbers are KoL's to shuffle and the words are what the plan
+// actually means. KoLmafia is asked for the options rather than the page being scraped, so what is
+// matched here is the same text a submission is checked against.
+//
+// Any row's words will do, not only this one's. A choice left standing belongs to whichever row
+// put it there, and the walk may well reach a different row first -- the morning that found this
+// had one row part-done ahead of the row the choice belonged to. Which row answered it is left in
+// dietChoiceOwner, because that row's food is already eaten: the choice comes after the swallowing,
+// so a choice of its is proof the step happened.
+//
+// Returns "" when there was nothing to answer or it was answered, and the trouble otherwise. An
+// unanswered choice is always worth stopping for: KoL will do nothing else while one is open.
+int dietChoiceOwner = -1;
+
+string dietOffered() {
+	buffer saw;
+	foreach option, says in available_choice_options(true) {
+		saw.append((saw.length() > 0 ? "; " : "") + option + ") " + says);
+	}
+	return saw.length() > 0 ? saw.to_string() : "nothing KoLmafia can see";
+}
+
+string dietAnswerChoice(dietStep [int] steps, int i, string pick) {
+	dietChoiceOwner = -1;
+	if (!handling_choice()) return "";
+
+	int want = 0;
+	string said;
+	foreach option, says in available_choice_options(true) {
+		if (want == 0 && pick != "" && says.contains_text(pick)) {
+			want = option;
+			said = pick;
+			dietChoiceOwner = i;
+		}
+	}
+	if (want == 0) {
+		foreach option, says in available_choice_options(true) {
+			foreach j, other in steps {
+				if (want == 0 && other.pick != "" && says.contains_text(other.pick)) {
+					want = option;
+					said = other.pick;
+					dietChoiceOwner = j;
+				}
+			}
+		}
+	}
+	if (want == 0) {
+		return "KoL is holding a choice open and no step in the plan says which button to press. It offers: "
+			+ dietOffered();
+	}
+	print("  picking \"" + said + "\" (option " + want + ")");
+	run_choice(want);
+	if (handling_choice()) return "picked \"" + said + "\" and KoL is still holding a choice open";
+	return "";
+}
+
 // --- the awkward ones -------------------------------------------------------
 
 // Rest at the campsite for the Pork Elf toilet's point of fullness.
@@ -984,6 +1047,29 @@ void dietStepAction() {
 	}
 	boolean dry = form_field("dry") == "1";
 	dietStep s = steps[i];
+
+	// A choice left standing from a step that stopped inside one. KoL will do nothing else while it
+	// is open -- not eat, not drink, not even look -- so it is answered before anything is judged.
+	if (!dry && handling_choice()) {
+		string stuck = dietAnswerChoice(steps, i, s.pick);
+		if (stuck != "") {
+			dietTrouble(s, i, stuck);
+			write("{\"ok\":false,\"error\":" + dietQuoted(stuck) + ",\"did\":0}");
+			return;
+		}
+		// Whoever's button that was has already eaten: the choice comes after the swallowing. So
+		// the row is recorded as done, which is what stops the morning eating a second one of it.
+		if (dietChoiceOwner >= 0) {
+			dietRecord(dietChoiceOwner, 1, 0);
+			print("  " + dietSayStep(steps[dietChoiceOwner], dietChoiceOwner)
+				+ " had already gone down; its choice was still open, and is now answered.");
+			if (dietChoiceOwner == i) {
+				write("{\"ok\":true,\"did\":1,\"gained\":0,\"left\":0,\"organs\":" + dietOrgansJSON() + "}");
+				return;
+			}
+		}
+	}
+
 	int [int] done = dietReadDone();
 	int did = done contains i ? done[i] : 0;
 	int need = s.count - did;
@@ -1110,6 +1196,12 @@ void dietStepAction() {
 					if (!queued) trouble = "could not queue the " + dietPlain(it.to_string())
 						+ " for what comes after it";
 				}
+				// KoL may put a choice in front of you the moment the thing goes down -- a
+				// legendary noodle dish asks how to digest it -- and KoLmafia aborts on one it has
+				// no table for, which is what "Unsupported choice adventure #1599" was. The row
+				// says which button, so it gets pressed here.
+				string asked = dietAnswerChoice(steps, i, s.pick);
+				if (asked != "") trouble = asked;
 				didNow = had - it.item_amount();
 				if (queued && didNow < 1) didNow = n;
 				if (didNow < 1 && trouble == "") {

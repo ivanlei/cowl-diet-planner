@@ -846,6 +846,12 @@
 	// it and a plan saved before the row did has to be given it back.
 	var PALATE = 'Refined Palate';
 
+	// What to pick when a legendary noodle dish asks how to digest it. KoL puts a choice in front
+	// of you after the dish goes down, and KoLmafia has no table for that one, so the row has to
+	// carry the answer or the morning stops in it. By the words on the button, never by its number:
+	// the numbers are KoL's to shuffle and the words are what the plan actually means.
+	var DIGESTION = 'With my Spleen';
+
 	// What the drink that spends the Stooper's point has to say, wherever it comes from.
 	var STOOPER_NOTE = 'before your last turns: put the Stooper out, drink it, and play them with it still out';
 
@@ -924,7 +930,8 @@
 				{room: [u[6][0] * n, 0, 0], cost: (u[4] - cfg.pill) * n});
 		});
 		take(function (u) { return /\(Digestion\)$/.test(u[0]); }).forEach(function (e) {
-			add('eat', e[0], e[1], 'then pick With my Spleen: −1 fullness, +1 spleen', {room: [0, 0, e[1]]});
+			add('eat', e[0], e[1], 'then pick ' + DIGESTION + ': −1 fullness, +1 spleen',
+				{room: [0, 0, e[1]], pick: DIGESTION});
 		});
 		if (cfg.toilet) push({action: 'use', name: 'Pork Elf toilet', kind: 'campground', count: 1, adv: null, parts: [],
 			room: [-1, 0, 0], cost: 0, note: 'rest once after 2 fullness, and eat into the room'});
@@ -1268,10 +1275,16 @@
 		// A plan saved before rows carried the wish: this planner only ever wishes for one thing,
 		// so giving it back is naming a constant rather than reading the note's prose.
 		out = out.map(function (r) {
-			if (r.name !== 'pocket wish' || r.wish) return r;
+			var wish = r.name === 'pocket wish' && !r.wish;
+			// A dish that digests is the only row this planner ever puts a choice behind, and the
+			// note it wrote says which button -- but the words are a constant here, so it is named
+			// rather than read back out of the sentence.
+			var pick = !r.pick && /then pick /.test(r.note || '');
+			if (!wish && !pick) return r;
 			var up = {};
 			Object.keys(r).forEach(function (k) { up[k] = r[k]; });
-			up.wish = PALATE;
+			if (wish) up.wish = PALATE;
+			if (pick) up.pick = DIGESTION;
 			return up;
 		});
 		var cup = out.filter(function (r) { return r.name === 'Cup of 13s'; })[0];
@@ -1302,7 +1315,7 @@
 		return [r.phase || 'start', r.action, r.kind, r.name, r.count, flags.join(','),
 			// "0" rather than empty for a row that wishes for nothing: a trailing empty field is
 			// dropped by the split at the other end, and the record then arrives one short.
-			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2], r.wish || '0'].join('^');
+			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2], r.wish || '0', r.pick || '0'].join('^');
 	}
 
 	function stepList(rows) {

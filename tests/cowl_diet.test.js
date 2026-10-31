@@ -178,19 +178,26 @@ assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the mo
 // Handing a plan to cowl_diet_do.ash: one record per step, "^" between fields and "|" between
 // steps, in the order that script reads them. Pinned because the two have to agree exactly, and a
 // field slipping a place would have it eating the wrong row.
-assert.strictEqual(plan.stepRecord(rows[0]), 'start^cast^skill^The Ode to Booze^1^^^0^0^0^0');
+assert.strictEqual(plan.stepRecord(rows[0]), 'start^cast^skill^The Ode to Booze^1^^^0^0^0^0^0');
 const toiletRow = rows.find(r => r.name === 'Pork Elf toilet');
-assert.strictEqual(plan.stepRecord(toiletRow), 'start^use^campground^Pork Elf toilet^1^^^-1^0^0^0',
+assert.strictEqual(plan.stepRecord(toiletRow), 'start^use^campground^Pork Elf toilet^1^^^-1^0^0^0^0',
 	'the toilet gives a point of fullness back, and the record says so');
 const capRow = rows[rows.length - 1];
 assert.ok(/^end\^drink\^item\^/.test(plan.stepRecord(capRow)) && /\^nightcap\^/.test(plan.stepRecord(capRow)),
 	'the nightcap goes over as an end-of-day drink, flagged');
 assert.strictEqual(plan.stepList(rows).split('|').length, rows.length, 'one record per row');
-assert.ok(!plan.stepList(rows).split('|').some(r => r.split('^').length !== 11), 'eleven fields each');
+assert.ok(!plan.stepList(rows).split('|').some(r => r.split('^').length !== 12), 'twelve fields each');
 // A row that wishes for nothing says "0" rather than nothing at all: a trailing empty field is
 // dropped by the split at the other end, and the record then arrives one short -- which is how a
 // whole plan came back as "a step arrived with 10 fields".
 assert.ok(plan.stepList(rows).split('|').every(r => !/\^$/.test(r)), 'no record ends in an empty field');
+// A dish that digests carries the button to press, for the same reason: KoLmafia has no table for
+// that choice, so without it the morning stops inside one.
+const digestRow = rows.find(r => /then pick /.test(r.note || ''));
+if (digestRow) {
+	assert.strictEqual(digestRow.pick, 'With my Spleen');
+	assert.ok(plan.stepRecord(digestRow).endsWith('^With my Spleen'));
+}
 // The wish carries its target, because a script cannot wish for prose.
 const wishRow = rows.find(r => r.name === 'pocket wish');
 if (wishRow) {
