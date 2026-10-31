@@ -68,6 +68,19 @@ assert.strictEqual(caps[0].action, 'drink');
 assert.strictEqual(caps[0].phase, 'end');
 assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the morning overdrinks');
 
+// Handing a plan to cowl_diet_do.ash: one record per step, "^" between fields and "|" between
+// steps, in the order that script reads them. Pinned because the two have to agree exactly, and a
+// field slipping a place would have it eating the wrong row.
+assert.strictEqual(plan.stepRecord(rows[0]), 'start^cast^skill^The Ode to Booze^1^^^0^0^0');
+const toiletRow = rows.find(r => r.name === 'Pork Elf toilet');
+assert.strictEqual(plan.stepRecord(toiletRow), 'start^use^campground^Pork Elf toilet^1^^^-1^0^0',
+	'the toilet gives a point of fullness back, and the record says so');
+const capRow = rows[rows.length - 1];
+assert.ok(/^end\^drink\^item\^/.test(plan.stepRecord(capRow)) && /\^nightcap\^/.test(plan.stepRecord(capRow)),
+	'the nightcap goes over as an end-of-day drink, flagged');
+assert.strictEqual(plan.stepList(rows).split('|').length, rows.length, 'one record per row');
+assert.ok(!plan.stepList(rows).split('|').some(r => r.split('^').length !== 10), 'ten fields each');
+
 // The Cup of 13s: a 5 + 5 + 3 mix is 13 adventures for 1 drunk, and worth having at 55k.
 const withCup = JSON.parse(JSON.stringify(data));
 withCup.account.cup = true;

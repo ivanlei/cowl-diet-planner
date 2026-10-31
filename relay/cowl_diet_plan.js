@@ -1061,9 +1061,30 @@
 		return frontier.slice(Math.max(0, i - k), i + k + 1).map(function (p) { return p[3]; });
 	}
 
+	// --- handing a plan over to be carried out ---------------------------------------
+	//
+	// cowl_diet_do.ash does the eating, and it cannot read the locked plan for itself: the plan is
+	// JSON and ASH has no way to parse JSON. So the rows go over as records -- one per step, fields
+	// separated by "^", steps by "|", a Cup of 13s' ingredients by "~". None of those three occurs
+	// in the name of any item, skill, effect or familiar KoLmafia knows.
+	//
+	// It lives here, beside dayRows, because the two have to agree about what a row is, and the
+	// format is pinned by a test for the same reason. room goes over as it stands -- for all count
+	// of the row -- since the plan's numbers are the only ones that know a shotglass drink costs no
+	// liver and a pill-doubled food fills twice its fullness.
+	function stepRecord(r) {
+		return [r.phase || 'start', r.action, r.kind, r.name, r.count, r.nightcap ? 'nightcap' : '',
+			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2]].join('^');
+	}
+
+	function stepList(rows) {
+		return rows.map(stepRecord).join('|');
+	}
+
 	var API = {buildConfig: buildConfig, normalize: normalize, planDay: planDay, sweep: sweep, planFor: planFor,
 		sweepAsync: sweepAsync, dayRows: dayRows, describe: describe, SECTIONS: SECTIONS, rint: rint,
-		applyMarket: applyMarket, marketPrice: marketPrice, dropUnsold: dropUnsold, stockCount: stockCount, around: around};
+		applyMarket: applyMarket, marketPrice: marketPrice, dropUnsold: dropUnsold, stockCount: stockCount,
+		around: around, stepRecord: stepRecord, stepList: stepList};
 	if (typeof module !== 'undefined' && module.exports) module.exports = API;
 	else window.cowlDietPlan = API;
 })();
