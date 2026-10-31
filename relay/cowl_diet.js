@@ -80,6 +80,7 @@
 	var stepRows = null, stepsBusy = false;    // the Consume tab: where the locked plan stands
 	var grabArmed = null;                      // Grab supplies, dry-run once and waiting for a second press
 	var walkArmed = '';                        // a phase that has been dry-walked and is waiting for a second press
+	var walkedPast = {};                       // rows that are yours to do and have already been stopped at once
 	var upgraded = '', lockedTooOld = '';      // an older locked plan, brought up to date or not
 
 	function esc(s) {
@@ -450,29 +451,44 @@
 		}
 	}
 
-	// Every step of a phase still worth attempting, in the plan's order.
+	// Every step of a phase still worth attempting, in the plan's order. A row that is yours to do
+	// by hand stays in: the walk has to stop at it rather than step over it, because what comes
+	// after may be counting on it. The pocket wish is the plain case -- it buys Refined Palate, and
+	// the wines a few rows later are priced at +25% for having it.
 	function phaseQueue(phase) {
 		return stepRows.steps.filter(function (s) {
-			return s.phase === phase && !s.nightcap && s.state !== 'done' && s.state !== 'you';
+			return s.phase === phase && !s.nightcap && s.state !== 'done';
 		}).map(function (s) { return s.i; });
 	}
 
 	function walkPhase(phase, dry) {
-		var did = 0, failed = null, skipped = 0, passes = 0;
+		var did = 0, failed = null, skipped = 0, passes = 0, yours = null;
 		function onePass() {
 			var before = did;
 			passes++;
 			return phaseQueue(phase).reduce(function (chain, i) {
 				return chain.then(function () {
 					if (failed) return null;
+					if (yours) return null;
 					return api('cowl_diet_do.ash', {action: 'step', i: i, dry: dry ? 1 : 0}).then(function (res) {
 						if (!res.ok) { failed = {i: i, why: res.error}; return; }
-						if (res.skipped) { skipped++; return; }
+						if (res.skipped) {
+							// Yours to do, and not yet stepped past: stop here. Press again and the
+							// walk goes by it, so a wish you have decided against cannot wedge the
+							// morning for ever.
+							if (res.state === 'you' && !walkedPast[i]) {
+								walkedPast[i] = true;
+								yours = {i: i, why: res.said};
+								return;
+							}
+							skipped++;
+							return;
+						}
 						did += res.did || 0;
 					});
 				});
 			}, Promise.resolve()).then(function () {
-				if (failed || passes >= WALK_PASSES) return null;
+				if (failed || yours || passes >= WALK_PASSES) return null;
 				// A dry walk cannot change anything, so going round again would say the same thing
 				// twice; it is the real one that needs the second look.
 				if (dry) return null;
@@ -484,7 +500,9 @@
 				});
 			});
 		}
-		return onePass().then(function () { return {did: did, failed: failed, skipped: skipped, passes: passes}; });
+		return onePass().then(function () {
+			return {did: did, failed: failed, skipped: skipped, passes: passes, yours: yours};
+		});
 	}
 
 	function breakfast() {
@@ -503,6 +521,8 @@
 				// spleen the mojo filters free -- which means its count is a floor and the steps
 				// waiting on those read as not ready. Said, rather than left to look like a problem.
 				consumeSay((out.failed ? 'Would stop at step ' + (out.failed.i + 1) + ': ' + out.failed.why + '. '
+					: out.yours ? 'Would stop at step ' + (out.yours.i + 1) + ', which is yours to do: ' + out.yours.why
+						+ '. ' + out.did + ' things before it. '
 					: 'The morning reads through: at least ' + out.did + ' things would go down'
 						+ (out.skipped ? ', ' + out.skipped + ' not ready yet' : '') + '. ')
 					+ (out.skipped || out.failed ? '' : '')
@@ -515,7 +535,10 @@
 			disarmWalk();
 			var said = out.failed
 				? 'Stopped at step ' + (out.failed.i + 1) + ': ' + out.failed.why + ' \u2014 the gCLI says more.'
-				: 'Breakfast done: ' + out.did + ' things, in ' + out.passes + (out.passes === 1 ? ' pass' : ' passes') + '.';
+				: out.yours
+					? 'Did ' + out.did + ', then stopped at step ' + (out.yours.i + 1) + ', which is yours: ' + out.yours.why
+						+ ' Do it and press Breakfast again \u2014 or press again to go past it.'
+					: 'Breakfast done: ' + out.did + ' things, in ' + out.passes + (out.passes === 1 ? ' pass' : ' passes') + '.';
 			consumeSoon(true, said, !!out.failed);
 		}).catch(function (e) {
 			stepsBusy = false;
@@ -791,6 +814,7 @@
 	function forgetProgress() {
 		disarmGrab();
 		disarmWalk();
+		walkedPast = {};
 		// Said out loud rather than returned on quietly. A browser that suppresses dialogs answers
 		// no without showing one, and a button that then does nothing and says nothing is the same
 		// button as a broken one -- which is how the dialog on Grab supplies was found.
