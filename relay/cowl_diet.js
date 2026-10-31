@@ -461,6 +461,10 @@
 		}
 		stepsBusy = true;
 		consumeButtons();
+		// What the table said a moment ago, so that pressing Check can report what moved. Arriving
+		// on the tab draws the table anyway, which left the button looking like it did nothing.
+		var before = stepRows ? stepRows.steps : null;
+		if (!quiet) consumeSay('Asking KoLmafia\u2026');
 		post('cowl_diet_do.ash', {action: 'open', at: locked.at, steps: P.stepList(locked.rows)}).then(function (res) {
 			if (!res.ok) throw new Error(res.error);
 			return api('cowl_diet_do.ash', {action: 'check', quiet: quiet ? 1 : 0});
@@ -469,7 +473,7 @@
 			stepRows = res;
 			stepsBusy = false;
 			consumeButtons();
-			drawConsume();
+			drawConsume(quiet ? null : (before || []));
 		}).catch(function (e) {
 			stepsBusy = false;
 			stepRows = null;
@@ -497,7 +501,32 @@
 		return html.join('');
 	}
 
-	function drawConsume() {
+	// What moved since the last look, in words. Empty when nothing did, which is itself worth
+	// saying: "nothing has changed" is an answer, and a button that gives no answer at all reads
+	// as a button that does nothing.
+	function changedSince(before) {
+		if (!before || !before.length) return '';
+		var was = {};
+		before.forEach(function (s) { was[s.i] = s; });
+		var moved = stepRows.steps.filter(function (s) {
+			var b = was[s.i];
+			return b && (b.state !== s.state || b.done !== s.done);
+		});
+		if (!moved.length) return 'nothing has changed since the last look';
+		var fresh = moved.filter(function (s) { return s.state === 'done'; }).length;
+		var named = moved.slice(0, 3).map(function (s) {
+			// A row that went from none done to some done has not changed state, and saying it "is
+			// ready" is saying nothing: the count is the news.
+			if (was[s.i].done !== s.done && s.done > 0 && s.done < s.count) {
+				return s.name + ' is ' + s.done + ' of ' + s.count;
+			}
+			return s.name + ' is ' + ((STEP_STATE[s.state] || STEP_STATE.ready)[2]);
+		});
+		return (fresh ? fresh + (fresh === 1 ? ' step is' : ' steps are') + ' newly done; ' : '')
+			+ named.join(', ') + (moved.length > 3 ? ', and ' + (moved.length - 3) + ' more' : '');
+	}
+
+	function drawConsume(before) {
 		if (!stepRows || !consumeEl) return;
 		var html = ['<div class="cd-day">' + esc(organLine(stepRows.organs)) + '</div>'];
 		if (upgraded) {
@@ -520,9 +549,11 @@
 		var done = stepRows.steps.filter(function (s) { return s.state === 'done'; }).length;
 		var stuck = stepRows.steps.filter(function (s) { return s.state === 'no'; }).length;
 		var yours = stepRows.steps.filter(function (s) { return s.state === 'you'; }).length;
+		var moved = before ? changedSince(before) : '';
 		consumeSay(done + ' of ' + n + ' done'
 			+ (stuck ? '; ' + stuck + (stuck === 1 ? ' step can’t' : ' steps can’t') + ' be done as things stand' : '')
-			+ (yours ? '; ' + yours + ' for you to do by hand' : '') + '.', stuck > 0);
+			+ (yours ? '; ' + yours + ' for you to do by hand' : '') + '.'
+			+ (moved ? ' Checked just now — ' + moved + '.' : ''), stuck > 0);
 	}
 
 	function forgetProgress() {

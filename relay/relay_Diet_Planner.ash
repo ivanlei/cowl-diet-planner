@@ -65,15 +65,18 @@ void main() {
 
 	out.append("<div id='cd-tab-consume' class='cd-pane' role='tabpanel' hidden>\n");
 	out.append("<div class='cd-controls'>\n");
-	out.append("<button type='button' class='cd-refresh cd-go' id='cd-consume-check'>Check</button>\n");
+	out.append("<button type='button' class='cd-refresh cd-go' id='cd-consume-check'>Check again</button>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-consume-forget'>Forget today’s progress</button>\n");
 	out.append("</div>\n");
 	out.append("<div id='cd-consume-said' class='cd-said cd-consume-said'></div>\n");
 	out.append("<div id='cd-consume'><p class='cd-said'>Reading KoLmafia's tables...</p></div>\n");
 	out.append("<p class='cd-note'>This tab carries out the plan you <b>locked</b> on the Diet tab, and only that one:"
-		+ " a plan that can change under a day's eating is not a plan to eat. <b>Check</b> asks KoLmafia where every"
-		+ " step stands and changes nothing; it writes the same lines to the gCLI, which is where to look when a step"
-		+ " goes wrong. Nothing on this tab eats, drinks, casts or buys anything yet.</p>\n");
+		+ " a plan that can change under a day's eating is not a plan to eat.</p>\n");
+	out.append("<p class='cd-note'>The table is read from KoLmafia the moment you open this tab, so you do not have to"
+		+ " press anything to see where the day stands. <b>Check again</b> reads it afresh \u2014 for after you have eaten"
+		+ " something by hand, grabbed supplies or taken the Cup off \u2014 and says what moved since the last look. It also"
+		+ " writes every line to the gCLI, which is where to look when a step goes wrong. It changes nothing either way:"
+		+ " nothing on this tab eats, drinks, casts or buys anything yet.</p>\n");
 	out.append("</div>\n");
 	out.append("</div>\n");
 
