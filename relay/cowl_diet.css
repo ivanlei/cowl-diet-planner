@@ -15,6 +15,7 @@
 	--cd-here:   light-dark(#eef3fb, #1c2533);
 	--cd-big:    light-dark(#1d4f91, #7aa2ff);
 	--cd-ok:     light-dark(green, #5fab5f);
+	--cd-bad:    light-dark(#b00, #ff7a7a);
 }
 
 body {
@@ -176,10 +177,26 @@ table.cd-camp, table.cd-rumpus { width: auto; }
 /* --- Shopping ----------------------------------------------------------------- */
 #cd-days { width: 5em; }
 .cd-shop tr.cd-part td.cd-item { padding-left: 18px; }
-.cd-short { color: light-dark(#b00, #ff7a7a); font-weight: bold; }
+.cd-short { color: var(--cd-bad); font-weight: bold; }
 #cd-shelf { max-width: 22em; }
 .cd-shelf-said { margin-top: 4px; min-height: 1.2em; }
 .cd-bank tfoot td { font-weight: bold; }
+
+/* --- Consume ------------------------------------------------------------------
+ *
+ * One table per half of the day, each row a step with a mark for where it stands. The marks are
+ * four different shapes rather than four colours, because the one that matters is "can't" and a
+ * colour on its own is a poor way to say so. The state's colour has to be said again for the
+ * last cell: .cd-why sets its own colour further up the file and would otherwise win. */
+.cd-tick { width: 1.4em; text-align: center; font-weight: bold; }
+.cd-steps .cd-why { white-space: normal; }
+.cd-steps .cd-why.cd-ok { color: var(--cd-ok); }
+.cd-steps .cd-why.cd-short { color: var(--cd-bad); }
+.cd-steps .cd-why.cd-said { color: var(--cd-note); font-weight: normal; }
+.cd-cap { font-size: 11px; color: var(--cd-note); border: 1px solid var(--cd-edge);
+	border-radius: 3px; padding: 0 4px; margin-left: 4px; white-space: nowrap; }
+.cd-consume-said { margin-top: 4px; min-height: 1.2em; }
+
 
 @media (max-width: 700px) {
 	.cd-why { max-width: none; }

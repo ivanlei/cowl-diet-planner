@@ -50,13 +50,17 @@
 	var lockSaid = document.getElementById('cd-lock-said');
 	var rollEl = document.getElementById('cd-rollover');
 	var shopEl = document.getElementById('cd-shop');
+	var consumeEl = document.getElementById('cd-consume');
+	var consumeSaidEl = document.getElementById('cd-consume-said');
+	var consumeCheckBtn = document.getElementById('cd-consume-check');
+	var consumeForgetBtn = document.getElementById('cd-consume-forget');
 	var tabBar = document.getElementById('cd-tabs');
 
 	var STORE = 'cowlDiet';
 	var MARKET_STORE = 'cowlDietMarket', MARKET_HOURS = 3;
 	var PRESETS = [25000, 55000, 100000, 250000, 500000, 1000000];
 	var CURVE = [10000, 25000, 55000, 100000, 250000, 500000, 1000000, 2000000];
-	var TABS = ['rollover', 'diet', 'shopping'];
+	var TABS = ['rollover', 'diet', 'shopping', 'consume'];
 	var WIKI = 'https://wiki.kingdomofloathing.com/index.php?go=Go&search=';
 	var ORGANS = ['fullness', 'drunk', 'spleen'];
 
@@ -71,6 +75,7 @@
 	var shown = null;    // the plan on screen, live or saved, for the shopping tab
 	var days = 31, shopFor = '', shopRows = null, shopTimer = null;
 	var shelfName = '', shelvesAsked = false;  // the storage shelf, by name
+	var stepRows = null, stepsBusy = false;    // the Consume tab: where the locked plan stands
 
 	function esc(s) {
 		return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -383,12 +388,151 @@
 		root.innerHTML = html.join('');
 		fetchFacts(v.rows.map(function (r) { return r.name; }));
 		if (tab === 'shopping') shopSoon();
+		if (tab === 'consume' && !stepsBusy) consumeSoon(true);
 		// a budget picked after the last Plan may name things the mall hasn't been asked about
 		if (!locked && !busy) {
 			var unchecked = Object.keys(v.items).filter(function (n) { return !market[n]; }).length;
 			priceSaid.textContent = !unchecked ? DONE : unchecked + (unchecked === 1 ? ' thing in this plan hasn’t'
 				: ' things in this plan haven’t') + ' been checked against the mall: press Plan to check.';
 		}
+	}
+
+	// --- the Consume tab ------------------------------------------------------------------
+	//
+	// The locked plan is handed to cowl_diet_do.ash once, and from then on the table is drawn from
+	// what that script says rather than from the rows here. That is the point rather than an
+	// inefficiency: the list ticking off in front of you has to be the same list the eating will be
+	// done from, and drawing the server's own copy is the only way to be sure of it.
+
+	// A step's state as a mark, a colour and a word. The marks are the whole table at a glance, so
+	// they are deliberately four different shapes rather than four colours: the one that matters is
+	// "can't", and a colour alone is a poor way to say it.
+	var STEP_STATE = {
+		done: ['✓', 'cd-ok', 'done'],
+		part: ['½', 'cd-ok', 'part done'],
+		ready: ['·', '', 'ready'],
+		held: ['…', 'cd-said', 'not yet'],
+		you: ['→', 'cd-said', 'yours to do'],
+		no: ['✗', 'cd-short', 'can’t']
+	};
+
+	function consumeSay(msg, bad) {
+		consumeSaidEl.className = 'cd-said cd-consume-said' + (bad ? ' cd-short' : '');
+		consumeSaidEl.textContent = msg;
+	}
+
+	function consumeButtons() {
+		consumeCheckBtn.disabled = stepsBusy || !locked;
+		consumeForgetBtn.disabled = stepsBusy || !locked;
+	}
+
+	function organLine(o) {
+		return 'Fullness ' + o.fullness[0] + '/' + o.fullness[1] + ' · drunk ' + o.drunk[0] + '/' + o.drunk[1]
+			+ ' · spleen ' + o.spleen[0] + '/' + o.spleen[1] + ' · HP ' + o.hp[0] + '/' + o.hp[1]
+			+ ' · MP ' + o.mp[0] + '/' + o.mp[1];
+	}
+
+	// Hand the rows over, then read back where each of them stands. quiet keeps it out of the gCLI,
+	// which is right for arriving on the tab and wrong for pressing Check.
+	function consumeSoon(quiet) {
+		if (!consumeEl) return;
+		if (!locked) {
+			stepRows = null;
+			consumeEl.innerHTML = '<p class="cd-said">Nothing is locked. Lock a plan on the Diet tab and this tab will'
+				+ ' carry out that one: a plan that can change under a day’s eating is not a plan to eat.</p>';
+			consumeSay('');
+			consumeButtons();
+			return;
+		}
+		// A plan locked before this tab existed has no phase on its rows, and there is no honest way
+		// to work out from the outside which of them belong after the day's turns -- the nightcap and
+		// the Stooper's kept drink look like any other drink once the reason they were put last is
+		// gone. So it is refused rather than guessed at. The plan itself is still fine to read; it is
+		// only carrying it out that needs the extra field.
+		if (locked.rows.some(function (r) { return !r.phase; })) {
+			stepRows = null;
+			consumeEl.innerHTML = '<p class="cd-said">The locked plan was made before this tab existed, so it doesn’t'
+				+ ' say which of its steps come after the day’s turns — and guessing which drink is the nightcap is'
+				+ ' not a guess worth making. On the Diet tab press <b>Unlock</b> and then <b>Lock</b> again, on the same'
+				+ ' budget, and this tab will carry it out.</p>';
+			consumeSay('');
+			consumeButtons();
+			return;
+		}
+		stepsBusy = true;
+		consumeButtons();
+		post('cowl_diet_do.ash', {action: 'open', at: locked.at, steps: P.stepList(locked.rows)}).then(function (res) {
+			if (!res.ok) throw new Error(res.error);
+			return api('cowl_diet_do.ash', {action: 'check', quiet: quiet ? 1 : 0});
+		}).then(function (res) {
+			if (!res.ok) throw new Error(res.error);
+			stepRows = res;
+			stepsBusy = false;
+			consumeButtons();
+			drawConsume();
+		}).catch(function (e) {
+			stepsBusy = false;
+			stepRows = null;
+			consumeButtons();
+			consumeEl.innerHTML = '';
+			consumeSay(e.message || 'KoLmafia didn’t answer.', true);
+		});
+	}
+
+	function stepTable(title, rows) {
+		var html = ['<h2>' + title + '</h2>',
+			'<table class="cd-order cd-steps"><tr><th></th><th>Action</th><th colspan="2">Item</th>'
+				+ '<th>n</th><th>Where it stands</th></tr>'];
+		rows.forEach(function (s) {
+			var st = STEP_STATE[s.state] || STEP_STATE.ready;
+			html.push('<tr><td class="cd-tick ' + st[1] + '">' + st[0] + '</td>'
+				+ '<td class="cd-act">' + esc(s.action) + '</td>'
+				+ iconCell(s.name)
+				+ '<td class="cd-item">' + nameHtml(s.name)
+				+ (s.nightcap ? ' <span class="cd-cap">the overdrink</span>' : '') + '</td>'
+				+ '<td class="cd-num">' + (s.done > 0 && s.done < s.count ? s.done + ' of ' + s.count : s.count) + '</td>'
+				+ '<td class="cd-why ' + st[1] + '">' + esc(s.said || st[2]) + '</td></tr>');
+		});
+		html.push('</table>');
+		return html.join('');
+	}
+
+	function drawConsume() {
+		if (!stepRows || !consumeEl) return;
+		var html = ['<div class="cd-day">' + esc(organLine(stepRows.organs)) + '</div>'];
+		if (stepRows.ledger === 'stale') {
+			html.push('<p class="cd-short">Today’s progress was recorded against a different plan — this one was'
+				+ ' locked again since — so it has been set aside, and every step below reads as not yet done.</p>');
+		}
+		[['start', 'The start of the day'], ['end', 'After the day’s turns']].forEach(function (half) {
+			var rows = stepRows.steps.filter(function (s) { return s.phase === half[0]; });
+			if (rows.length) html.push(stepTable(half[1], rows));
+		});
+		consumeEl.innerHTML = html.join('');
+		fetchFacts(stepRows.steps.map(function (s) { return s.name; }));
+		var n = stepRows.steps.length;
+		var done = stepRows.steps.filter(function (s) { return s.state === 'done'; }).length;
+		var stuck = stepRows.steps.filter(function (s) { return s.state === 'no'; }).length;
+		var yours = stepRows.steps.filter(function (s) { return s.state === 'you'; }).length;
+		consumeSay(done + ' of ' + n + ' done'
+			+ (stuck ? '; ' + stuck + (stuck === 1 ? ' step can’t' : ' steps can’t') + ' be done as things stand' : '')
+			+ (yours ? '; ' + yours + ' for you to do by hand' : '') + '.', stuck > 0);
+	}
+
+	function forgetProgress() {
+		if (!window.confirm('Forget today’s progress? Nothing is eaten or undone — the table simply stops'
+			+ ' claiming these steps have been done.')) return;
+		stepsBusy = true;
+		consumeButtons();
+		api('cowl_diet_do.ash', {action: 'reset'}).then(function (res) {
+			if (!res.ok) throw new Error(res.error);
+			stepsBusy = false;
+			consumeSoon(true);
+		}).catch(function (e) {
+			stepsBusy = false;
+			consumeButtons();
+			consumeSay(e.message || 'KoLmafia didn’t answer.', true);
+		});
 	}
 
 	function showTab(name) {
@@ -400,6 +544,7 @@
 			b.setAttribute('aria-selected', t === tab ? 'true' : 'false');
 		});
 		if (tab === 'shopping') shopSoon(0);
+		if (tab === 'consume') consumeSoon(true);
 	}
 
 	// Pictures and description ids for names, asked once each; the plan and the shopping list are
@@ -413,6 +558,7 @@
 			Object.keys(res.facts).forEach(function (n) { facts[n] = res.facts[n]; });
 			draw();
 			if (shopRows) drawShop();
+			if (stepRows) drawConsume();
 		}).catch(function () { names.forEach(function (n) { delete asked[n]; }); });
 	}
 
@@ -775,6 +921,8 @@
 	});
 	lockBtn.addEventListener('click', toggleLock);
 	planBtn.addEventListener('click', planPressed);
+	if (consumeCheckBtn) consumeCheckBtn.addEventListener('click', function () { consumeSoon(false); });
+	if (consumeForgetBtn) consumeForgetBtn.addEventListener('click', forgetProgress);
 	tabBar.addEventListener('click', function (e) {
 		var b = e.target.closest && e.target.closest('[data-tab]');
 		if (!b) return;

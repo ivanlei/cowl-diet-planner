@@ -31,7 +31,8 @@ void main() {
 	out.append("<div class='cd-tabs' id='cd-tabs' role='tablist'>"
 		+ "<button type='button' role='tab' class='cd-tab cd-on' data-tab='rollover' aria-selected='true'>Rollover</button>"
 		+ "<button type='button' role='tab' class='cd-tab' data-tab='diet' aria-selected='false'>Diet</button>"
-		+ "<button type='button' role='tab' class='cd-tab' data-tab='shopping' aria-selected='false'>Shopping</button></div>\n");
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='shopping' aria-selected='false'>Shopping</button>"
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='consume' aria-selected='false'>Consume</button></div>\n");
 	out.append("<div id='cd-tab-diet' class='cd-pane' role='tabpanel' hidden>\n");
 
 	out.append("<div class='cd-controls'>\n");
@@ -60,6 +61,19 @@ void main() {
 	out.append("</div>\n");
 	out.append("<div id='cd-tab-shopping' class='cd-pane' role='tabpanel' hidden>\n");
 	out.append("<div id='cd-shop' class='cd-shopping'><p class='cd-said'>Waiting for a plan on the Diet tab.</p></div>\n");
+	out.append("</div>\n");
+
+	out.append("<div id='cd-tab-consume' class='cd-pane' role='tabpanel' hidden>\n");
+	out.append("<div class='cd-controls'>\n");
+	out.append("<button type='button' class='cd-refresh cd-go' id='cd-consume-check'>Check</button>\n");
+	out.append("<button type='button' class='cd-refresh' id='cd-consume-forget'>Forget today’s progress</button>\n");
+	out.append("</div>\n");
+	out.append("<div id='cd-consume-said' class='cd-said cd-consume-said'></div>\n");
+	out.append("<div id='cd-consume'><p class='cd-said'>Reading KoLmafia's tables...</p></div>\n");
+	out.append("<p class='cd-note'>This tab carries out the plan you <b>locked</b> on the Diet tab, and only that one:"
+		+ " a plan that can change under a day's eating is not a plan to eat. <b>Check</b> asks KoLmafia where every"
+		+ " step stands and changes nothing; it writes the same lines to the gCLI, which is where to look when a step"
+		+ " goes wrong. Nothing on this tab eats, drinks, casts or buys anything yet.</p>\n");
 	out.append("</div>\n");
 	out.append("</div>\n");
 
