@@ -66,6 +66,8 @@ void main() {
 	out.append("<div id='cd-tab-consume' class='cd-pane' role='tabpanel' hidden>\n");
 	out.append("<div class='cd-controls'>\n");
 	out.append("<button type='button' class='cd-refresh cd-go' id='cd-consume-check'>Check again</button>\n");
+	out.append("<button type='button' class='cd-refresh' id='cd-consume-grab'>Grab supplies</button>\n");
+	out.append("<label class='cd-dry'><input type='checkbox' id='cd-consume-dry'> Dry run</label>\n");
 	out.append("<button type='button' class='cd-refresh' id='cd-consume-forget'>Forget today’s progress</button>\n");
 	out.append("</div>\n");
 	out.append("<div id='cd-consume-said' class='cd-said cd-consume-said'></div>\n");
@@ -75,8 +77,11 @@ void main() {
 	out.append("<p class='cd-note'>The table is read from KoLmafia the moment you open this tab, so you do not have to"
 		+ " press anything to see where the day stands. <b>Check again</b> reads it afresh \u2014 for after you have eaten"
 		+ " something by hand, grabbed supplies or taken the Cup off \u2014 and says what moved since the last look. It also"
-		+ " writes every line to the gCLI, which is where to look when a step goes wrong. It changes nothing either way:"
-		+ " nothing on this tab eats, drinks, casts or buys anything yet.</p>\n");
+		+ " writes every line to the gCLI, which is where to look when a step goes wrong. It changes nothing either way.</p>\n");
+	out.append("<p class='cd-note'><b>Grab supplies</b> takes what the rest of the plan still needs out of your display"
+		+ " case shelf, then your closet, then Hagnk's when pulls are free \u2014 for what is left to do, so a day half"
+		+ " eaten doesn't fetch twice. It never buys anything and never touches the clan stash. <b>Dry run</b> says what"
+		+ " it would fetch and moves nothing. Nothing on this tab eats, drinks or casts anything yet.</p>\n");
 	out.append("</div>\n");
 	out.append("</div>\n");
 
