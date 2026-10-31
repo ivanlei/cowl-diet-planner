@@ -54,6 +54,8 @@
 	var consumeSaidEl = document.getElementById('cd-consume-said');
 	var consumeCheckBtn = document.getElementById('cd-consume-check');
 	var consumeForgetBtn = document.getElementById('cd-consume-forget');
+	var consumeGrabBtn = document.getElementById('cd-consume-grab');
+	var consumeDryBox = document.getElementById('cd-consume-dry');
 	var tabBar = document.getElementById('cd-tabs');
 
 	var STORE = 'cowlDiet';
@@ -425,6 +427,47 @@
 	function consumeButtons() {
 		consumeCheckBtn.disabled = stepsBusy || !locked;
 		consumeForgetBtn.disabled = stepsBusy || !locked;
+		if (consumeGrabBtn) consumeGrabBtn.disabled = stepsBusy || !stepRows;
+	}
+
+	function grabSupplies() {
+		var dry = consumeDryBox && consumeDryBox.checked;
+		if (!dry && !window.confirm('Take what the rest of this plan still needs out of your display case, your closet'
+			+ ' and Hagnk\u2019s, into your inventory? Nothing is bought, nothing is eaten, and the clan stash is not'
+			+ ' touched.')) return;
+		stepsBusy = true;
+		consumeButtons();
+		consumeSay(dry ? 'Working out what it would fetch\u2026' : 'Fetching\u2026');
+		api('cowl_diet_do.ash', {action: 'supplies', dry: dry ? 1 : 0}).then(function (res) {
+			if (!res.ok) throw new Error(res.error);
+			var from = {'case': 0, closet: 0, storage: 0};
+			res.items.forEach(function (i) {
+				from['case'] += i['case']; from.closet += i.closet; from.storage += i.storage;
+			});
+			var where = [];
+			if (from['case']) where.push(from['case'] + ' from your display case');
+			if (from.closet) where.push(from.closet + ' from your closet');
+			if (from.storage) where.push(from.storage + ' from Hagnk\u2019s');
+			var said = !res.items.length ? 'Everything the rest of the plan needs is already in your inventory'
+				: (dry ? 'Would fetch ' : 'Fetched ') + res.items.length
+					+ (res.items.length === 1 ? ' thing' : ' things') + (where.length ? ': ' + where.join(', ') : '')
+					+ (res.short ? '; ' + res.short + ' still short' : '');
+			stepsBusy = false;
+			if (dry) {
+				consumeButtons();
+				consumeSay(said + '. Nothing was moved \u2014 that was a dry run. The gCLI has it item by item.',
+					res.short > 0);
+			} else {
+				// Re-read rather than guess: the rows that were waiting on these should now say so
+				// themselves.
+				consumeSoon(true);
+				window.setTimeout(function () { consumeSay(said + '. The gCLI has it item by item.', res.short > 0); }, 300);
+			}
+		}).catch(function (e) {
+			stepsBusy = false;
+			consumeButtons();
+			consumeSay(e.message || 'KoLmafia didn\u2019t answer.', true);
+		});
 	}
 
 	function organLine(o) {
@@ -1027,6 +1070,7 @@
 	planBtn.addEventListener('click', planPressed);
 	if (consumeCheckBtn) consumeCheckBtn.addEventListener('click', function () { consumeSoon(false); });
 	if (consumeForgetBtn) consumeForgetBtn.addEventListener('click', forgetProgress);
+	if (consumeGrabBtn) consumeGrabBtn.addEventListener('click', grabSupplies);
 	tabBar.addEventListener('click', function (e) {
 		var b = e.target.closest && e.target.closest('[data-tab]');
 		if (!b) return;

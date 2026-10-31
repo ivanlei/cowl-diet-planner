@@ -625,6 +625,122 @@ void dietOpen() {
 	write("{\"ok\":true,\"steps\":" + count(kept) + ",\"fresh\":" + fresh + "}");
 }
 
+// --- a day's supplies, from where you keep them ----------------------------
+//
+// What the kept plan still needs, less what is already in inventory, taken out of the display
+// case shelf, the closet, and Hagnk's when pulls are free -- in that order, because the shelf is
+// where the Shopping tab put them and emptying it first leaves the other two alone.
+//
+// It never buys. It never touches the clan stash, which is not yours to spend. And it asks for
+// what is LEFT to do rather than for a whole day, so a day half eaten does not fetch twice.
+
+record dietWant {
+	int id;
+	int want;
+};
+
+// Everything the remaining steps need in inventory, by item: the rows themselves, and the three
+// things a Cup of 13s row mixes.
+int [item] dietNeeded(dietStep [int] steps, int [int] done) {
+	int [item] want;
+	foreach i, s in steps {
+		if (s.kind != "item") continue;
+		int left = s.count - (done contains i ? done[i] : 0);
+		if (left < 1) continue;
+		item it = s.id.to_item();
+		if (it == $item[none]) continue;
+		// The Cup is not drunk, it is opened -- what the row consumes is the mix.
+		if (it == $item[Cup of 13s]) {
+			foreach j, one in s.mix.split_string(MIX_SEP) {
+				if (one == "") continue;
+				item part = one.to_int().to_item();
+				if (part != $item[none]) want[part] = want[part] + left;
+			}
+			continue;
+		}
+		want[it] = want[it] + left;
+	}
+	return want;
+}
+
+void dietSupplies() {
+	dietStep [int] steps = dietReadSteps();
+	if (count(steps) == 0) {
+		write("{\"ok\":false,\"error\":\"No plan is being carried out. Open the Consume tab first.\"}");
+		return;
+	}
+	boolean dry = form_field("dry") == "1";
+	boolean pulls = can_interact();  // out of Ronin, taking from Hagnk's costs nothing
+	int [item] want = dietNeeded(steps, dietReadDone());
+
+	print("");
+	print("Diet Planner: " + (dry ? "what Grab supplies would fetch" : "fetching a day's supplies")
+		+ (pulls ? "" : " (in Ronin, so Hagnk's is left alone)") + ".", "blue");
+
+	buffer out;
+	out.append("{\"ok\":true,\"dry\":" + dry + ",\"items\":[");
+	int n = 0, moved = 0, shortOf = 0;
+	foreach it, need in want {
+		int had = it.item_amount();
+		if (had >= need) continue;
+		int fromCase = 0, fromCloset = 0, fromStorage = 0;
+		// Each take is followed by reading the count again rather than trusting what it returned:
+		// the question is how many are in hand now, and that is a thing KoLmafia can simply be
+		// asked.
+		int gap = need - had;
+		int take = it.display_amount() < gap ? it.display_amount() : gap;
+		if (take > 0) {
+			fromCase = take;
+			if (!dry) {
+				take_display(take, it);
+				fromCase = it.item_amount() - had;
+			}
+		}
+		gap = need - (dry ? had + fromCase : it.item_amount());
+		take = it.closet_amount() < gap ? it.closet_amount() : gap;
+		if (take > 0) {
+			fromCloset = take;
+			if (!dry) {
+				int before = it.item_amount();
+				take_closet(take, it);
+				fromCloset = it.item_amount() - before;
+			}
+		}
+		gap = need - (dry ? had + fromCase + fromCloset : it.item_amount());
+		take = pulls && it.storage_amount() < gap ? it.storage_amount() : (pulls ? gap : 0);
+		if (take > 0) {
+			fromStorage = take;
+			if (!dry) {
+				int before = it.item_amount();
+				take_storage(take, it);
+				fromStorage = it.item_amount() - before;
+			}
+		}
+		int got = fromCase + fromCloset + fromStorage;
+		int still = need - (dry ? had + got : it.item_amount());
+		if (got > 0) moved = moved + 1;
+		if (still > 0) shortOf = shortOf + 1;
+
+		string where;
+		if (fromCase > 0) where += (where == "" ? "" : ", ") + fromCase + " from the case";
+		if (fromCloset > 0) where += (where == "" ? "" : ", ") + fromCloset + " from the closet";
+		if (fromStorage > 0) where += (where == "" ? "" : ", ") + fromStorage + " from Hagnk's";
+		print("  " + (dry ? "would take " : "took ") + (where == "" ? "nothing" : where) + " for "
+			+ need + " " + dietPlain(it.to_string()) + " (had " + had + ")"
+			+ (still > 0 ? " -- still " + still + " short" : ""));
+
+		if (n++ > 0) out.append(",");
+		out.append("{\"name\":" + dietQuoted(dietPlain(it.to_string())) + ",\"want\":" + need
+			+ ",\"had\":" + had + ",\"case\":" + fromCase + ",\"closet\":" + fromCloset
+			+ ",\"storage\":" + fromStorage + ",\"short\":" + (still > 0 ? still : 0) + "}");
+	}
+	if (n == 0) print("  Everything the rest of the plan needs is already in your inventory.");
+	print("Diet Planner: " + (dry ? "nothing was moved; that was a dry run." : moved + " of them fetched"
+		+ (shortOf > 0 ? ", " + shortOf + " still short" : "") + "."), "blue");
+	out.append("],\"moved\":" + moved + ",\"short\":" + shortOf + "}");
+	out.write();
+}
+
 void dietCheck() {
 	dietStep [int] steps = dietReadSteps();
 	buffer out;
@@ -667,6 +783,8 @@ void main() {
 		set_property(DIET_DONE, "");
 		print("Diet Planner: today's progress forgotten; nothing was eaten or undone.", "blue");
 		write("{\"ok\":true}");
+	} else if (action == "supplies") {
+		dietSupplies();
 	} else if (action == "check" || action == "") {
 		dietCheck();
 	} else {
