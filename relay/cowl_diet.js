@@ -76,6 +76,7 @@
 	var days = 31, shopFor = '', shopRows = null, shopTimer = null;
 	var shelfName = '', shelvesAsked = false;  // the storage shelf, by name
 	var stepRows = null, stepsBusy = false;    // the Consume tab: where the locked plan stands
+	var upgraded = '', lockedTooOld = '';      // an older locked plan, brought up to date or not
 
 	function esc(s) {
 		return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -444,17 +445,16 @@
 			consumeButtons();
 			return;
 		}
-		// A plan locked before this tab existed has no phase on its rows, and there is no honest way
-		// to work out from the outside which of them belong after the day's turns -- the nightcap and
-		// the Stooper's kept drink look like any other drink once the reason they were put last is
-		// gone. So it is refused rather than guessed at. The plan itself is still fine to read; it is
-		// only carrying it out that needs the extra field.
-		if (locked.rows.some(function (r) { return !r.phase; })) {
+		// A plan made before rows carried a phase is brought up to date when the page loads, from
+		// the notes its own code wrote. Only one that could not be read that way stops here, and it
+		// says what went wrong -- unlocking is the last resort, since it plans again on today's
+		// prices and that is the plan you locked to keep.
+		if (lockedTooOld) {
 			stepRows = null;
-			consumeEl.innerHTML = '<p class="cd-said">The locked plan was made before this tab existed, so it doesn’t'
-				+ ' say which of its steps come after the day’s turns — and guessing which drink is the nightcap is'
-				+ ' not a guess worth making. On the Diet tab press <b>Unlock</b> and then <b>Lock</b> again, on the same'
-				+ ' budget, and this tab will carry it out.</p>';
+			consumeEl.innerHTML = '<p class="cd-said">This plan was locked before this tab existed, and working out which'
+				+ ' of its steps come after the day’s turns didn’t come out right: ' + esc(lockedTooOld) + '. Rather than'
+				+ ' carry out a day it has misread, it stops here. On the Diet tab press <b>Unlock</b> and then'
+				+ ' <b>Lock</b> again — which does mean planning again on today’s prices.</p>';
 			consumeSay('');
 			consumeButtons();
 			return;
@@ -500,6 +500,12 @@
 	function drawConsume() {
 		if (!stepRows || !consumeEl) return;
 		var html = ['<div class="cd-day">' + esc(organLine(stepRows.organs)) + '</div>'];
+		if (upgraded) {
+			html.push('<p class="cd-said">This plan was locked before this tab existed. Which of its steps come after'
+				+ ' the day’s turns has been read off the notes it carries, and nothing stored has been changed — the'
+				+ ' plan, its prices and its lock are exactly as they were'
+				+ (upgraded === 'yes' ? '.' : '. One thing couldn’t be read: ' + esc(upgraded) + '.') + '</p>');
+		}
 		if (stepRows.ledger === 'stale') {
 			html.push('<p class="cd-short">Today’s progress was recorded against a different plan — this one was'
 				+ ' locked again since — so it has been set aside, and every step below reads as not yet done.</p>');
@@ -955,6 +961,21 @@
 		var saved = load(), a = data.account;
 		try { locked = d.account.locked ? JSON.parse(d.account.locked) : null; } catch (e) { locked = null; }
 		if (locked && locked.v !== 1) locked = null;
+		// A plan locked before rows carried a phase is brought up to date here, in memory, rather
+		// than refused by the Consume tab: unlocking to get the field back would plan again on
+		// today's prices, and not losing that plan is the whole of what Lock is for. Nothing
+		// stored is touched -- the upgrade lasts as long as the page does, and cowl_diet_do.ash
+		// still checks the plan's own timestamp against what is actually locked.
+		if (locked && locked.rows && locked.rows.some(function (r) { return !r.phase; })) {
+			var up = P.upgradeRows(locked.rows, locked.night, locked.into);
+			if (up.ok) {
+				locked.rows = up.rows;
+				upgraded = up.why || 'yes';
+			} else {
+				upgraded = '';
+				lockedTooOld = up.why;
+			}
+		}
 		budget = locked ? locked.budget : saved.budget >= 0 ? saved.budget : 55000;
 		days = saved.days >= 1 ? saved.days : 31;
 		choices = {feast: a.feastToday, toilet: a.toilet, stooper: a.stooper, nightcap: true, yeti: a.yeti,
