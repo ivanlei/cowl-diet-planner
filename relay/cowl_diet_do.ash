@@ -1076,6 +1076,7 @@ void dietStepAction() {
 				didNow = n;
 			} else {
 				int had = it.item_amount();
+				boolean queued = false;
 				// Counted off the inventory afterwards rather than off what the call returned:
 				// three of five going down is a thing to record as three, not as a failure.
 				if (s.nightcap) overdrink(1, it);
@@ -1088,18 +1089,32 @@ void dietStepAction() {
 				// says "use" it stops the morning with "[item] cannot be used". Its own command
 				// names the verb it wants in that case -- eaten for a food or a food helper, drunk
 				// for booze or a drink helper, chewed for a spleen item -- so the organ the item
-				// fills picks the verb here. A helper fills none, so it is tried as a food and then
-				// as a drink, and the wrong one of those cannot do any harm: the command refuses a
-				// drink helper under eat and a food helper under drink.
+				// fills picks the verb here.
 				else if (it.fullness > 0) eat(n, it);
 				else if (it.inebriety > 0) drink(n, it);
 				else if (it.spleen > 0) chew(n, it);
 				else {
-					eat(n, it);
-					if (it.item_amount() == had) drink(n, it);
+					// A helper fills no organ, and KoLmafia does not spend one when you ask for it:
+					// it queues it against the next food, and the spork only leaves your bag when
+					// that food goes down. KoL works the same way round -- using a spork opens a
+					// list of your food and eats one with it -- so the queue is the honest model,
+					// and the inventory count says nothing at all about whether the step worked.
+					// eat()'s own answer is the signal.
+					//
+					// The queue is emptied first because it is KoLmafia's, not this script's, and
+					// it survives a step that failed afterwards: without this, running the step
+					// twice asks for two sporks from somebody who owns one.
+					clear_food_helper();
+					queued = eat(n, it);
+					if (!queued) queued = drink(n, it);  // a drink helper wants the other verb
+					if (!queued) trouble = "could not queue the " + dietPlain(it.to_string())
+						+ " for what comes after it";
 				}
 				didNow = had - it.item_amount();
-				if (didNow < 1) trouble = "nothing went down -- you still have " + it.item_amount();
+				if (queued && didNow < 1) didNow = n;
+				if (didNow < 1 && trouble == "") {
+					trouble = "nothing went down -- you still have " + it.item_amount();
+				}
 			}
 		}
 	}
