@@ -1179,6 +1179,11 @@
 	// format is pinned by a test for the same reason. room goes over as it stands -- for all count
 	// of the row -- since the plan's numbers are the only ones that know a shotglass drink costs no
 	// liver and a pill-doubled food fills twice its fullness.
+	//
+	// Names are what goes over, because names are all a plan built in a browser has. They are
+	// resolved to KoLmafia's own ids once, on arrival, and the records that script keeps carry the
+	// id instead -- so a name is never looked up twice and never looked up at the moment something
+	// is about to be eaten.
 	function stepRecord(r) {
 		return [r.phase || 'start', r.action, r.kind, r.name, r.count, r.nightcap ? 'nightcap' : '',
 			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2]].join('^');
