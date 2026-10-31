@@ -961,6 +961,13 @@
 		});
 		take(function (u) { return u[1] === 'extra'; }).forEach(function (e) { add('use', e[0], e[1], 'any time'); });
 		// end of day
+		// The Stooper is a familiar, so it is a row of its own, the way the Cooler Yeti is. Saying it
+		// only in the note on the drink was saying it nowhere anybody was looking: a plan is a list
+		// of things to do, and "take the Stooper out" is one of them.
+		if (kept || cupKept) {
+			info('use', 'Stooper', 'familiar', 'take it out: the point of liver the next drink spends is its',
+				{phase: 'end'});
+		}
 		if (kept) add('drink', kept, 1, STOOPER_NOTE, {phase: 'end', stooper: true});
 		else if (cupKept) {
 			add('drink', cupKept[0], cupKept[1], cupNote(cupKept[0][0], cfg) + '; ' + STOOPER_NOTE,
@@ -972,9 +979,15 @@
 		var onTheLine = !!(kept || cupKept);
 		var nc = take(function (u) { return u[1] === 'nightcap'; });
 		var ncYeti = nc.some(function (e) { return e[0][0].indexOf('[yeti]') >= 0; });
-		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap'
-			+ (onTheLine ? '; then put the Stooper back out, or the nightcap is refused for being too drunk' : ''),
+		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap',
 			{phase: 'end'});
+		// And out again afterwards, as its own row for the same reason. Swapping to the yeti takes
+		// its point of liver with it and leaves you past your limit, and KoL will not start a drink
+		// for somebody already past -- so without this the nightcap is simply refused.
+		if (onTheLine && ncYeti) {
+			info('use', 'Stooper', 'familiar', 'take it out again: the yeti swap left you past your limit, and the nightcap'
+				+ ' is refused for anybody already past', {phase: 'end'});
+		}
 		nc.forEach(function (e) { add('drink', e[0], e[1], 'nightcap: after the day’s turns; leaves you falling-down drunk'
 			+ (onTheLine ? '; with the Stooper out' : ''), {phase: 'end', nightcap: true}); });
 		if (morning.length) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), for tomorrow’s first drink',
@@ -1165,6 +1178,11 @@
 	// The repair needs no re-planning, because nothing about what is drunk is wrong. The Cup moves
 	// to the end, where a drink spending that point has to be, and carries the note. Same drinks,
 	// same adventures, same prices.
+	function stooperRow(note) {
+		return {action: 'use', name: 'Stooper', kind: 'familiar', count: 1, adv: null, parts: [],
+			room: [0, 0, 0], cost: 0, note: note, phase: 'end'};
+	}
+
 	function keepCupForStooper(rows) {
 		if (rows.some(function (r) { return /Stooper out/.test(r.note || ''); })) return rows;
 		var cup = null;
@@ -1182,20 +1200,32 @@
 		// nightcap comes after that.
 		var at = out.length;
 		out.forEach(function (r, i) { if (at === out.length && r.phase === 'end') at = i; });
-		out.splice(at, 0, moved);
+		out.splice(at, 0, stooperRow('take it out: the point of liver the next drink spends is its'), moved);
+		// And back out after the yeti swap, which otherwise leaves the nightcap refused.
+		var yeti = -1;
+		out.forEach(function (r, i) { if (yeti < 0 && /just before the nightcap/.test(r.note || '')) yeti = i; });
+		if (yeti >= 0) {
+			out.splice(yeti + 1, 0, stooperRow('take it out again: the yeti swap left you past your limit, and the'
+				+ ' nightcap is refused for anybody already past'));
+		}
+		// The nightcap says it wants the Stooper out. The yeti row is left alone: putting it back
+		// out is a row of its own now, and saying the same thing twice in two places is how the
+		// two come to disagree later.
 		return out.map(function (r) {
-			if (!/^nightcap/.test(r.note || '') && !/just before the nightcap/.test(r.note || '')) return r;
+			if (!/^nightcap/.test(r.note || '')) return r;
 			var up = {};
 			Object.keys(r).forEach(function (k) { up[k] = r[k]; });
-			up.note = r.note + (/^nightcap/.test(r.note) ? '; with the Stooper out'
-				: '; then put the Stooper back out, or the nightcap is refused for being too drunk');
+			up.note = r.note + '; with the Stooper out';
 			return up;
 		});
 	}
 
 	function upgradeRows(rows, night, into, stooper) {
 		var out = rows.map(function (r) {
-			var mark = phaseOfNote(r.note);
+			// The Stooper is only ever taken out for the drink that spends its point, which is the
+			// end of the day by construction -- read off the row rather than off its note, since a
+			// row that says what it is does not need its prose parsed.
+			var mark = r.kind === 'familiar' && r.name === 'Stooper' ? 'end' : phaseOfNote(r.note);
 			var up = {};
 			Object.keys(r).forEach(function (k) { up[k] = r[k]; });
 			up.phase = mark === 'start' ? 'start' : 'end';

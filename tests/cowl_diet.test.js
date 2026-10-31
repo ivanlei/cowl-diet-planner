@@ -146,14 +146,24 @@ assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the mo
 	// A saved plan with the same hole is repaired without re-planning: the same rows, the same
 	// adventures and the same meat, with the Cup moved to where a drink spending that point has
 	// to be.
-	const holed = {rows: rowsS.map(r => Object.assign({}, r)), night: {nightcap: {name: rowsS.find(r => r.nightcap).name}, stooper: null}};
-	holed.rows.forEach(r => {
-		if (r.name === 'Cup of 13s') { r.phase = 'start'; r.note = r.note.replace(/; before your last turns.*$/, ''); }
-		if (r.nightcap) r.note = r.note.replace('; with the Stooper out', '');
-	});
+	// Built the way a plan saved before this fix actually looked: no Stooper rows at all, and the
+	// Cup among the cleaners in the start of the day, where it spends the point far too early.
+	const holed = {night: {nightcap: {name: rowsS.find(r => r.nightcap).name}, stooper: null}};
+	holed.rows = rowsS.filter(r => r.name !== 'Stooper' && r.name !== 'Cup of 13s').map(r => Object.assign({}, r));
+	const oldCup = Object.assign({}, rowsS.find(r => r.name === 'Cup of 13s'));
+	oldCup.phase = 'start';
+	delete oldCup.stooper;
+	oldCup.note = oldCup.note.replace(/; before your last turns.*$/, '');
+	holed.rows.splice(holed.rows.filter(r => r.phase === 'start').length, 0, oldCup);
+	holed.rows.forEach(r => { if (r.nightcap) r.note = r.note.replace('; with the Stooper out', ''); });
 	const fixed = plan.upgradeRows(holed.rows, holed.night, {}, true);
 	assert.ok(fixed.ok, fixed.why);
-	assert.strictEqual(fixed.rows.length, holed.rows.length, 'no row gained or lost');
+	// The only rows gained are the Stooper's own, which carry no adventures and no meat.
+	const added = fixed.rows.length - holed.rows.length;
+	assert.strictEqual(fixed.rows.filter(r => r.name === 'Stooper').length, added, 'only Stooper rows added');
+	assert.ok(added >= 1, 'the Stooper is a row of its own, not a note on somebody else\u2019s');
+	assert.ok(fixed.rows.filter(r => r.name === 'Stooper').every(r => r.kind === 'familiar' && r.phase === 'end'),
+		'and they are familiar rows at the end of the day');
 	assert.ok(Math.abs(fixed.rows.reduce((s, r) => s + (r.adv || 0), 0) - holed.rows.reduce((s, r) => s + (r.adv || 0), 0)) < 1e-9,
 		'the same adventures');
 	assert.ok(Math.abs(fixed.rows.reduce((s, r) => s + r.cost, 0) - holed.rows.reduce((s, r) => s + r.cost, 0)) < 1e-9,
