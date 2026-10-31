@@ -71,6 +71,7 @@ record dietStep {
 	int id;
 	int count;
 	boolean nightcap; // the one drink meant to take you past your limit
+	boolean stooper;  // the drink that spends the Stooper's point, which needs it out
 	string mix;       // a Cup of 13s' three ingredients, as ids, "~"-separated
 	// What the row costs each organ, for all count of it, as the plan worked it out. Carried rather
 	// than read back off the item, because the item does not know: a drink through the mime army
@@ -181,8 +182,11 @@ dietStep [int] dietReadSteps() {
 		// do not. A shorter record is one this script wrote before that was true: dropped rather
 		// than read, since the page hands the plan over again on every visit to the tab.
 		if (count(f) < 11) continue;
+		// The flags field is a list, not a word: a drink can be both the nightcap and the one the
+		// Stooper's point is spent by, and on a day with no Cup it often is.
 		steps[count(steps)] = new dietStep(f[0], f[1], f[2], f[3], f[10].to_int(), f[4].to_int(),
-			f[5] == "nightcap", f[6], f[7].to_int(), f[8].to_int(), f[9].to_int());
+			f[5].contains_text("nightcap"), f[5].contains_text("stooper"), f[6],
+			f[7].to_int(), f[8].to_int(), f[9].to_int());
 	}
 	return steps;
 }
@@ -486,6 +490,19 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 				"needs " + (per * need) + " " + what + " and " + left + " is free"
 					+ (fits > 0 ? ", so " + fits + " of them fit" : ""));
 		}
+	}
+
+	// The drink that spends the Stooper's point needs the Stooper out, and needs it to stay out:
+	// take it off while you are at 21 of 21 and you are at 21 of 20, which is falling-down drunk --
+	// no more turns, and KoL will not start the nightcap either.
+	if (s.stooper) {
+		if (!have_familiar($familiar[Stooper])) {
+			return new dietVerdict("no", "this drink spends the Stooper's point of liver and you don't have "
+				+ "a Stooper; without it this drink puts you over your limit");
+		}
+		string out = my_familiar() == $familiar[Stooper] ? "it's out now"
+			: "the " + my_familiar() + " is out: take the Stooper out first";
+		return new dietVerdict("ready", "with the Stooper out, and keep it out through the nightcap -- " + out);
 	}
 
 	// The nightcap is the one drink that is meant not to fit. KoL lets a drink of any size start

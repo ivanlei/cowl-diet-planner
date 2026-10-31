@@ -842,6 +842,9 @@
 		return m ? m[1].split(' + ') : [];
 	}
 
+	// What the drink that spends the Stooper's point has to say, wherever it comes from.
+	var STOOPER_NOTE = 'before your last turns: put the Stooper out, drink it, and play them with it still out';
+
 	function dayRows(units, cfg) {
 		var groups = new Bag(units).entries();
 		function take(pred) {
@@ -920,7 +923,7 @@
 		take(function (u) { return u[1] === 'spleen'; }).forEach(function (e) { add('chew', e[0], e[1]); });
 		// drink, keeping a 1-drunk drink back for the Stooper: drunk before the last turns and played,
 		// so only the nightcap is banked against the 200 cap
-		var kept = null;
+		var kept = null, cupKept = null;
 		take(function (u) { return u[1] === 'liver'; }).forEach(function (e) {
 			var n = e[1];
 			if (cfg.stooper && !kept && e[0][2] === 1) { kept = e[0]; n -= 1; }
@@ -937,6 +940,19 @@
 			[['Cup of 13s'], 'drink', '']].forEach(function (c) {
 			take(starts(c[0])).forEach(function (e) {
 				if (e[0][0].indexOf('Cup of 13s') === 0) {
+					// The Stooper's point of liver has to be spent by the LAST drink of the day.
+					// Spend it earlier and everything after it is over the limit -- which is not
+					// merely a smaller day, it is no day at all, since you cannot adventure while
+					// falling-down drunk and you cannot start another drink either.
+					//
+					// The keep-back above only sees the liver group, and the Cup is not in it: the
+					// Cup's drink is not booze. So a day whose only 1-drunk drink is the Cup used
+					// to take the Stooper's point and never say to put the Stooper out. It is kept
+					// here instead, which is the same thing the switch has always promised.
+					if (cfg.stooper && !kept && !cupKept && e[1] === 1 && e[0][6][1] === 1) {
+						cupKept = e;
+						return;
+					}
 					add('drink', e[0], e[1], cupNote(e[0][0], cfg), {name: 'Cup of 13s', mix: cupMix(e[0][0])});
 				} else {
 					add(c[1], e[0], e[1], c[2]);
@@ -945,14 +961,22 @@
 		});
 		take(function (u) { return u[1] === 'extra'; }).forEach(function (e) { add('use', e[0], e[1], 'any time'); });
 		// end of day
-		if (kept) add('drink', kept, 1, 'before your last turns: put the Stooper out, drink it, and play them with it still out',
-			{phase: 'end'});
+		if (kept) add('drink', kept, 1, STOOPER_NOTE, {phase: 'end', stooper: true});
+		else if (cupKept) {
+			add('drink', cupKept[0], cupKept[1], cupNote(cupKept[0][0], cfg) + '; ' + STOOPER_NOTE,
+				{name: 'Cup of 13s', mix: cupMix(cupKept[0][0]), phase: 'end', stooper: true});
+		}
+		// Once that point is spent you are at your limit only while the Stooper is out. Taking it
+		// off to talk to the yeti puts you past it, and KoL will not start a drink for somebody who
+		// is already past -- which is the whole of why the nightcap would be refused.
+		var onTheLine = !!(kept || cupKept);
 		var nc = take(function (u) { return u[1] === 'nightcap'; });
 		var ncYeti = nc.some(function (e) { return e[0][0].indexOf('[yeti]') >= 0; });
-		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap',
+		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap'
+			+ (onTheLine ? '; then put the Stooper back out, or the nightcap is refused for being too drunk' : ''),
 			{phase: 'end'});
-		nc.forEach(function (e) { add('drink', e[0], e[1], 'nightcap: after the day’s turns; leaves you falling-down drunk',
-			{phase: 'end', nightcap: true}); });
+		nc.forEach(function (e) { add('drink', e[0], e[1], 'nightcap: after the day’s turns; leaves you falling-down drunk'
+			+ (onTheLine ? '; with the Stooper out' : ''), {phase: 'end', nightcap: true}); });
 		if (morning.length) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), for tomorrow’s first drink',
 			{phase: 'end'});
 		groups.forEach(function (e) { add('use', e[0], e[1]); });  // anything not placed above
@@ -1131,7 +1155,45 @@
 		return 'start';
 	}
 
-	function upgradeRows(rows, night, into) {
+	// A saved plan that spends the Stooper's point without ever saying to put the Stooper out.
+	//
+	// The switch adds a point of liver and the plan spends it, but the row that makes that safe was
+	// only ever emitted for a 1-drunk drink in the liver group -- so a day whose only 1-drunk drink
+	// is the Cup of 13s counted the point and said nothing. Played as saved, that lands you over
+	// your limit at the Cup, which ends the day: no more turns and no nightcap.
+	//
+	// The repair needs no re-planning, because nothing about what is drunk is wrong. The Cup moves
+	// to the end, where a drink spending that point has to be, and carries the note. Same drinks,
+	// same adventures, same prices.
+	function keepCupForStooper(rows) {
+		if (rows.some(function (r) { return /Stooper out/.test(r.note || ''); })) return rows;
+		var cup = null;
+		rows.forEach(function (r) {
+			if (r.name === 'Cup of 13s' && r.count === 1 && r.room && r.room[1] === 1) cup = r;
+		});
+		if (!cup) return rows;
+		var moved = {};
+		Object.keys(cup).forEach(function (k) { moved[k] = cup[k]; });
+		moved.phase = 'end';
+		moved.stooper = true;
+		moved.note = (cup.note ? cup.note + '; ' : '') + STOOPER_NOTE;
+		var out = rows.filter(function (r) { return r !== cup; });
+		// Before the rest of the end of the day: the yeti is talked to after this drink, and the
+		// nightcap comes after that.
+		var at = out.length;
+		out.forEach(function (r, i) { if (at === out.length && r.phase === 'end') at = i; });
+		out.splice(at, 0, moved);
+		return out.map(function (r) {
+			if (!/^nightcap/.test(r.note || '') && !/just before the nightcap/.test(r.note || '')) return r;
+			var up = {};
+			Object.keys(r).forEach(function (k) { up[k] = r[k]; });
+			up.note = r.note + (/^nightcap/.test(r.note) ? '; with the Stooper out'
+				: '; then put the Stooper back out, or the nightcap is refused for being too drunk');
+			return up;
+		});
+	}
+
+	function upgradeRows(rows, night, into, stooper) {
 		var out = rows.map(function (r) {
 			var mark = phaseOfNote(r.note);
 			var up = {};
@@ -1163,6 +1225,7 @@
 		if (first >= 0 && !out.slice(first).every(function (r) { return r.phase === 'end'; })) {
 			return {ok: false, why: 'the steps that come after the day’s turns aren’t the last ones'};
 		}
+		if (stooper) out = keepCupForStooper(out);
 		var cup = out.filter(function (r) { return r.name === 'Cup of 13s'; })[0];
 		return {ok: true, rows: out,
 			why: cup && !(cup.mix && cup.mix.length) ? 'the Cup of 13s row doesn’t say what to mix' : ''};
@@ -1185,7 +1248,10 @@
 	// id instead -- so a name is never looked up twice and never looked up at the moment something
 	// is about to be eaten.
 	function stepRecord(r) {
-		return [r.phase || 'start', r.action, r.kind, r.name, r.count, r.nightcap ? 'nightcap' : '',
+		var flags = [];
+		if (r.nightcap) flags.push('nightcap');
+		if (r.stooper) flags.push('stooper');
+		return [r.phase || 'start', r.action, r.kind, r.name, r.count, flags.join(','),
 			(r.mix || []).join('~'), r.room[0], r.room[1], r.room[2]].join('^');
 	}
 

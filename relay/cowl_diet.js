@@ -483,6 +483,10 @@
 		});
 	}
 
+	function noteFor(i) {
+		return locked && locked.rows && locked.rows[i] ? (locked.rows[i].note || '') : '';
+	}
+
 	function stepTable(title, rows) {
 		var html = ['<h2>' + title + '</h2>',
 			'<table class="cd-order cd-steps"><tr><th></th><th>Action</th><th colspan="2">Item</th>'
@@ -493,7 +497,12 @@
 				+ '<td class="cd-act">' + esc(s.action) + '</td>'
 				+ iconCell(s.name)
 				+ '<td class="cd-item">' + nameHtml(s.name)
-				+ (s.nightcap ? ' <span class="cd-cap">the overdrink</span>' : '') + '</td>'
+				+ (s.nightcap ? ' <span class="cd-cap">the overdrink</span>' : '')
+				// The plan's own note, which on this tab is the instruction: "put the Stooper out
+				// and play your last turns with it still out" is not something to leave on another
+				// tab when this is the one being followed. It comes from the locked plan rather
+				// than over the wire, since that is where it already is.
+				+ (noteFor(s.i) ? '<div class="cd-sub">' + esc(noteFor(s.i)) + '</div>' : '') + '</td>'
 				+ '<td class="cd-num">' + (s.done > 0 && s.done < s.count ? s.done + ' of ' + s.count : s.count) + '</td>'
 				+ '<td class="cd-why ' + st[1] + '">' + esc(s.said || st[2]) + '</td></tr>');
 		});
@@ -998,7 +1007,7 @@
 		// stored is touched -- the upgrade lasts as long as the page does, and cowl_diet_do.ash
 		// still checks the plan's own timestamp against what is actually locked.
 		if (locked && locked.rows && locked.rows.some(function (r) { return !r.phase; })) {
-			var up = P.upgradeRows(locked.rows, locked.night, locked.into);
+			var up = P.upgradeRows(locked.rows, locked.night, locked.into, locked.choices && locked.choices.stooper);
 			if (up.ok) {
 				locked.rows = up.rows;
 				upgraded = up.why || 'yes';
