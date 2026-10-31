@@ -569,6 +569,11 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 			+ " now, and this is " + dietRoomPer(s, 1) + " more");
 	}
 
+	// Worth saying, because the table would otherwise show "use" against a thing that cannot be
+	// used and look like the bug it used to be.
+	if (s.action == "use" && !it.usable) {
+		return new dietVerdict("ready", "a helper: eaten rather than used, and it goes on the next food");
+	}
 	return new dietVerdict("ready", "");
 }
 
@@ -1077,7 +1082,22 @@ void dietStepAction() {
 				else if (s.action == "eat") eat(n, it);
 				else if (s.action == "drink") drink(n, it);
 				else if (s.action == "chew") chew(n, it);
-				else use(n, it);
+				else if (it.usable) use(n, it);
+				// KoLmafia will not "use" something that has to be eaten, drunk or chewed, and a
+				// food helper is one of those: the fudge spork's usable is false, and a plan that
+				// says "use" it stops the morning with "[item] cannot be used". Its own command
+				// names the verb it wants in that case -- eaten for a food or a food helper, drunk
+				// for booze or a drink helper, chewed for a spleen item -- so the organ the item
+				// fills picks the verb here. A helper fills none, so it is tried as a food and then
+				// as a drink, and the wrong one of those cannot do any harm: the command refuses a
+				// drink helper under eat and a food helper under drink.
+				else if (it.fullness > 0) eat(n, it);
+				else if (it.inebriety > 0) drink(n, it);
+				else if (it.spleen > 0) chew(n, it);
+				else {
+					eat(n, it);
+					if (it.item_amount() == had) drink(n, it);
+				}
 				didNow = had - it.item_amount();
 				if (didNow < 1) trouble = "nothing went down -- you still have " + it.item_amount();
 			}
