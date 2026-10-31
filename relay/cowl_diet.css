@@ -195,6 +195,9 @@ table.cd-camp, table.cd-rumpus { width: auto; }
 .cd-steps .cd-why.cd-said { color: var(--cd-note); font-weight: normal; }
 .cd-cap { font-size: 11px; color: var(--cd-note); border: 1px solid var(--cd-edge);
 	border-radius: 3px; padding: 0 4px; margin-left: 4px; white-space: nowrap; }
+.cd-room { white-space: nowrap; }
+.cd-run { font-weight: bold; }
+.cd-sub-inline { color: var(--cd-note); font-size: 11px; }
 .cd-consume-said { margin-top: 4px; min-height: 1.2em; }
 
 
