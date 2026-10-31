@@ -462,7 +462,7 @@
 	}
 
 	function walkPhase(phase, dry) {
-		var did = 0, failed = null, skipped = 0, passes = 0, yours = null;
+		var did = 0, failed = null, skipped = 0, passes = 0, yours = null, capped = false;
 		function onePass() {
 			var before = did;
 			passes++;
@@ -488,7 +488,14 @@
 					});
 				});
 			}, Promise.resolve()).then(function () {
-				if (failed || yours || passes >= WALK_PASSES) return null;
+				if (failed || yours) return null;
+				// The ceiling is a guard against going round for ever, not an ending. Reaching it
+				// while a pass was still getting things done means the day is unfinished, and
+				// saying "done" there would be a lie.
+				if (passes >= WALK_PASSES) {
+					capped = did > before;
+					return null;
+				}
 				// A dry walk cannot change anything, so going round again would say the same thing
 				// twice; it is the real one that needs the second look.
 				if (dry) return null;
@@ -501,7 +508,7 @@
 			});
 		}
 		return onePass().then(function () {
-			return {did: did, failed: failed, skipped: skipped, passes: passes, yours: yours};
+			return {did: did, failed: failed, skipped: skipped, passes: passes, yours: yours, capped: capped};
 		});
 	}
 
@@ -538,7 +545,11 @@
 				: out.yours
 					? 'Did ' + out.did + ', then stopped at step ' + (out.yours.i + 1) + ', which is yours: ' + out.yours.why
 						+ ' Do it and press Breakfast again \u2014 or press again to go past it.'
-					: 'Breakfast done: ' + out.did + ' things, in ' + out.passes + (out.passes === 1 ? ' pass' : ' passes') + '.';
+					: (out.capped ? 'Stopped after ' + out.passes + ' passes with ' + out.did
+							+ ' things done and more still going down \u2014 press Breakfast again to carry on.'
+						: 'Breakfast done: ' + out.did + ' things, in ' + out.passes
+							+ (out.passes === 1 ? ' pass' : ' passes')
+							+ (out.skipped ? '; ' + out.skipped + ' still not ready' : '') + '.');
 			consumeSoon(true, said, !!out.failed);
 		}).catch(function (e) {
 			stepsBusy = false;
