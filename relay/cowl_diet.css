@@ -198,7 +198,6 @@ table.cd-camp, table.cd-rumpus { width: auto; }
 .cd-room { white-space: nowrap; }
 .cd-run { font-weight: bold; }
 .cd-sub-inline { color: var(--cd-note); font-size: 11px; }
-.cd-dry { margin-left: 10px; color: var(--cd-note); white-space: nowrap; }
 .cd-consume-said { margin-top: 4px; min-height: 1.2em; }
 
 

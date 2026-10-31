@@ -55,7 +55,6 @@
 	var consumeCheckBtn = document.getElementById('cd-consume-check');
 	var consumeForgetBtn = document.getElementById('cd-consume-forget');
 	var consumeGrabBtn = document.getElementById('cd-consume-grab');
-	var consumeDryBox = document.getElementById('cd-consume-dry');
 	var tabBar = document.getElementById('cd-tabs');
 
 	var STORE = 'cowlDiet';
@@ -78,6 +77,7 @@
 	var days = 31, shopFor = '', shopRows = null, shopTimer = null;
 	var shelfName = '', shelvesAsked = false;  // the storage shelf, by name
 	var stepRows = null, stepsBusy = false;    // the Consume tab: where the locked plan stands
+	var grabArmed = null;                      // Grab supplies, dry-run once and waiting for a second press
 	var upgraded = '', lockedTooOld = '';      // an older locked plan, brought up to date or not
 
 	function esc(s) {
@@ -419,9 +419,9 @@
 		no: ['✗', 'cd-short', 'can’t']
 	};
 
-	function consumeSay(msg, bad) {
+	function consumeSay(msg, bad, html) {
 		consumeSaidEl.className = 'cd-said cd-consume-said' + (bad ? ' cd-short' : '');
-		consumeSaidEl.textContent = msg;
+		if (html) consumeSaidEl.innerHTML = msg; else consumeSaidEl.textContent = msg;
 	}
 
 	function consumeButtons() {
@@ -430,46 +430,68 @@
 		if (consumeGrabBtn) consumeGrabBtn.disabled = stepsBusy || !stepRows;
 	}
 
+	// Grab supplies, in two presses rather than behind a dialog.
+	//
+	// It used to ask with window.confirm, which is a bad way to guard anything on a relay page: a
+	// browser that suppresses dialogs returns false without showing one, and the whole function
+	// then returned having said nothing at all. A button that silently does nothing cannot be told
+	// apart from a button that is broken, and that is exactly how it was reported.
+	//
+	// So the first press is the dry run -- worth seeing anyway -- and it arms the button with what
+	// it found; the second press does that. Anything else that touches the tab disarms it, so a
+	// press left armed five minutes ago cannot be the one that fetches.
+	function grabSaid(res, dry) {
+		var from = {'case': 0, closet: 0, storage: 0};
+		res.items.forEach(function (i) { from['case'] += i['case']; from.closet += i.closet; from.storage += i.storage; });
+		var where = [];
+		if (from['case']) where.push(from['case'] + ' from your display case');
+		if (from.closet) where.push(from.closet + ' from your closet');
+		if (from.storage) where.push(from.storage + ' from Hagnk\u2019s');
+		if (!res.items.length) return 'Everything the rest of the plan needs is already in your inventory.';
+		return (dry ? 'Would fetch ' : 'Fetched ') + res.items.length + (res.items.length === 1 ? ' thing' : ' things')
+			+ (where.length ? ': ' + where.join(', ') : '') + (res.short ? '; ' + res.short + ' still short' : '') + '.';
+	}
+
+	function disarmGrab() {
+		grabArmed = null;
+		if (consumeGrabBtn) {
+			consumeGrabBtn.textContent = 'Grab supplies';
+			consumeGrabBtn.className = 'cd-refresh';
+		}
+	}
+
 	function grabSupplies() {
-		var dry = consumeDryBox && consumeDryBox.checked;
-		if (!dry && !window.confirm('Take what the rest of this plan still needs out of your display case, your closet'
-			+ ' and Hagnk\u2019s, into your inventory? Nothing is bought, nothing is eaten, and the clan stash is not'
-			+ ' touched.')) return;
+		var armed = grabArmed;
 		stepsBusy = true;
 		consumeButtons();
-		consumeSay(dry ? 'Working out what it would fetch\u2026' : 'Fetching\u2026');
-		api('cowl_diet_do.ash', {action: 'supplies', dry: dry ? 1 : 0}).then(function (res) {
+		consumeSay(armed ? 'Fetching\u2026' : 'Working out what it would fetch\u2026');
+		api('cowl_diet_do.ash', {action: 'supplies', dry: armed ? 0 : 1}).then(function (res) {
 			if (!res.ok) throw new Error(res.error);
-			var from = {'case': 0, closet: 0, storage: 0};
-			res.items.forEach(function (i) {
-				from['case'] += i['case']; from.closet += i.closet; from.storage += i.storage;
-			});
-			var where = [];
-			if (from['case']) where.push(from['case'] + ' from your display case');
-			if (from.closet) where.push(from.closet + ' from your closet');
-			if (from.storage) where.push(from.storage + ' from Hagnk\u2019s');
-			var said = !res.items.length ? 'Everything the rest of the plan needs is already in your inventory'
-				: (dry ? 'Would fetch ' : 'Fetched ') + res.items.length
-					+ (res.items.length === 1 ? ' thing' : ' things') + (where.length ? ': ' + where.join(', ') : '')
-					+ (res.short ? '; ' + res.short + ' still short' : '');
 			stepsBusy = false;
-			if (dry) {
-				consumeButtons();
-				consumeSay(said + '. Nothing was moved \u2014 that was a dry run. The gCLI has it item by item.',
-					res.short > 0);
-			} else {
-				// Re-read rather than guess: the rows that were waiting on these should now say so
-				// themselves.
-				consumeSoon(true);
-				window.setTimeout(function () { consumeSay(said + '. The gCLI has it item by item.', res.short > 0); }, 300);
+			if (armed) {
+				disarmGrab();
+				consumeSoon(true, grabSaid(res, false) + ' The gCLI has it item by item.', res.short > 0);
+				return;
 			}
+			if (!res.items.length) {
+				disarmGrab();
+				consumeButtons();
+				consumeSay(grabSaid(res, true));
+				return;
+			}
+			grabArmed = res;
+			consumeGrabBtn.textContent = 'Fetch them';
+			consumeGrabBtn.className = 'cd-refresh cd-go';
+			consumeButtons();
+			consumeSay(grabSaid(res, true) + ' Nothing has been moved yet \u2014 press <b>Fetch them</b> to do it.',
+				false, true);
 		}).catch(function (e) {
 			stepsBusy = false;
+			disarmGrab();
 			consumeButtons();
 			consumeSay(e.message || 'KoLmafia didn\u2019t answer.', true);
 		});
 	}
-
 	function organLine(o) {
 		return 'Fullness ' + o.fullness[0] + '/' + o.fullness[1] + ' · drunk ' + o.drunk[0] + '/' + o.drunk[1]
 			+ ' · spleen ' + o.spleen[0] + '/' + o.spleen[1] + ' · HP ' + o.hp[0] + '/' + o.hp[1]
@@ -478,7 +500,7 @@
 
 	// Hand the rows over, then read back where each of them stands. quiet keeps it out of the gCLI,
 	// which is right for arriving on the tab and wrong for pressing Check.
-	function consumeSoon(quiet) {
+	function consumeSoon(quiet, afterSaid, afterBad) {
 		if (!consumeEl) return;
 		if (!locked) {
 			stepRows = null;
@@ -502,6 +524,7 @@
 			consumeButtons();
 			return;
 		}
+		disarmGrab();
 		stepsBusy = true;
 		consumeButtons();
 		// What the table said a moment ago, so that pressing Check can report what moved. Arriving
@@ -517,6 +540,9 @@
 			stepsBusy = false;
 			consumeButtons();
 			drawConsume(quiet ? null : (before || []));
+			// After the redraw, not on a timer racing it: drawConsume writes the status line itself,
+			// and a message set before it lands is a message nobody sees.
+			if (afterSaid) consumeSay(afterSaid, afterBad);
 		}).catch(function (e) {
 			stepsBusy = false;
 			stepRows = null;
@@ -667,8 +693,15 @@
 	}
 
 	function forgetProgress() {
+		disarmGrab();
+		// Said out loud rather than returned on quietly. A browser that suppresses dialogs answers
+		// no without showing one, and a button that then does nothing and says nothing is the same
+		// button as a broken one -- which is how the dialog on Grab supplies was found.
 		if (!window.confirm('Forget today’s progress? Nothing is eaten or undone — the table simply stops'
-			+ ' claiming these steps have been done.')) return;
+			+ ' claiming these steps have been done.')) {
+			consumeSay('Left as it was. If you didn’t see a question, your browser is blocking them.');
+			return;
+		}
 		stepsBusy = true;
 		consumeButtons();
 		api('cowl_diet_do.ash', {action: 'reset'}).then(function (res) {
