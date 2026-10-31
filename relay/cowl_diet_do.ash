@@ -365,8 +365,13 @@ dietVerdict dietJudgeFamiliar(dietStep s, int done) {
 		}
 		return new dietVerdict("ready", "take it out and ask for impossibly cold");
 	}
-	if (done >= s.count) return new dietVerdict("done", "done");
-	return new dietVerdict("ready", "take it out");
+	// Any other familiar row is "have this one out", and whether it is out is a thing the game can
+	// be asked -- so it is, and the ledger is only what that answer is compared against. The
+	// Stooper appears twice in a day for this reason: out for the drink that spends its point, and
+	// out again after the yeti swap takes it away.
+	if (my_familiar() == fam) return new dietVerdict("done", "it's out");
+	if (done >= s.count) return dietDisagrees("the " + my_familiar() + " is out, not the " + fam);
+	return new dietVerdict("ready", "the " + my_familiar() + " is out: take the " + fam + " out");
 }
 
 dietVerdict dietJudgeCampground(dietStep s, int done) {
