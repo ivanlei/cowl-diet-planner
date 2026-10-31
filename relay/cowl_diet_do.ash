@@ -203,10 +203,31 @@ int [int] dietReadDone() {
 	foreach i, one in said.substring(colon + 1).split_string(",") {
 		if (one == "") continue;
 		string [int] parts = one.split_string("\\*");
-		if (count(parts) != 2) continue;
+		if (count(parts) < 2) continue;
 		done[parts[0].to_int()] = parts[1].to_int();
 	}
 	return done;
+}
+
+// The adventures a row actually turned into, where that was measured.
+//
+// A third part on a ledger entry, optional because it is only knowable for a row that has
+// actually been carried out and only meaningful for one that was meant to give adventures: an
+// equip gains none, and a row still to do has nothing to report. KoLmafia counts adventures
+// itself, so this is its number before the row and after it, not an estimate of its own.
+int [int] dietReadGained() {
+	int [int] got;
+	string said = get_property(DIET_DONE);
+	if (said == "") return got;
+	int colon = said.index_of(":");
+	if (colon < 0 || said.substring(0, colon) != get_property(DIET_STEPS_AT)) return got;
+	foreach i, one in said.substring(colon + 1).split_string(",") {
+		if (one == "") continue;
+		string [int] parts = one.split_string("\\*");
+		if (count(parts) < 3) continue;
+		got[parts[0].to_int()] = parts[2].to_int();
+	}
+	return got;
 }
 
 // "" when there is no ledger, "ok" when it is this plan's, "stale" when it is some other plan's --
@@ -611,6 +632,7 @@ void dietCheck() {
 		+ ",\"ledger\":" + dietQuoted(dietDoneState())
 		+ ",\"organs\":" + dietOrgansJSON() + ",\"steps\":[");
 	int [int] done = dietReadDone();
+	int [int] got = dietReadGained();
 	int toCome = dietDrunkToCome(steps, done);
 	boolean quiet = form_field("quiet") == "1";
 	if (!quiet) {
@@ -625,7 +647,8 @@ void dietCheck() {
 		if (n++ > 0) out.append(",");
 		out.append("{\"i\":" + i + ",\"phase\":" + dietQuoted(s.phase) + ",\"action\":" + dietQuoted(s.action)
 			+ ",\"kind\":" + dietQuoted(s.kind) + ",\"name\":" + dietQuoted(dietPlain(s.name))
-			+ ",\"count\":" + s.count + ",\"nightcap\":" + s.nightcap + ",\"done\":" + did
+			+ ",\"count\":" + s.count + ",\"nightcap\":" + s.nightcap + ",\"stooper\":" + s.stooper
+			+ ",\"done\":" + did + (got contains i ? ",\"gained\":" + got[i] : "")
 			+ ",\"state\":" + dietQuoted(v.state) + ",\"said\":" + dietQuoted(v.said) + "}");
 	}
 	out.append("]}");

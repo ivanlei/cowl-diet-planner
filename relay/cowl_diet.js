@@ -483,14 +483,66 @@
 		});
 	}
 
+	function planRow(i) {
+		return locked && locked.rows && locked.rows[i] ? locked.rows[i] : null;
+	}
 	function noteFor(i) {
-		return locked && locked.rows && locked.rows[i] ? (locked.rows[i].note || '') : '';
+		var r = planRow(i);
+		return r ? (r.note || '') : '';
 	}
 
-	function stepTable(title, rows) {
+	// The organ space a row takes, from the plan: "2 fullness", "4 drunk", "−3 spleen" where it
+	// frees some. The same text the Diet tab's own table uses, from the same numbers.
+	function roomFor(i) {
+		var r = planRow(i);
+		return r ? roomText(r.room) : '';
+	}
+
+	// The running total down the table, counting what actually happened where that is known and
+	// what the plan expects everywhere else -- which is the number worth carrying, since it is
+	// what the day now looks like rather than what it looked like this morning.
+	function runningTotal() {
+		var sum = 0;
+		return {add: function (s) {
+			var r = planRow(s.i);
+			var want = r && r.adv ? r.adv : 0;
+			if (s.gained === undefined || s.gained === null) {
+				sum += want;
+			} else {
+				// Three casseroles of eight down is three casseroles' worth of fact and five
+				// casseroles' worth of hope, and the total is both. Counting only what was
+				// measured would quietly write the rest of the row off.
+				var left = s.count > 0 ? Math.max(0, s.count - (s.done || 0)) / s.count : 0;
+				sum += s.gained + want * left;
+			}
+			return num(sum);
+		}};
+	}
+
+	// "187 (ave: 37.4)": what a row is worth in all, and what one of it is worth. The average is
+	// the half worth reading when a row is eight casseroles and only three of them have gone down.
+	function advText(total, n) {
+		if (total === null || total === undefined) return '';
+		return num(total) + (n > 1 ? ' <span class="cd-sub-inline">(ave: ' + (Math.round(total / n * 10) / 10) + ')</span>' : '');
+	}
+
+	// What a row actually turned into, where it has been carried out and the gain was measured,
+	// against what the plan said it would be. Plans are averages -- a 4-to-5 adventure food is not
+	// 4.5 adventures, it is four or five -- so the two differing is ordinary rather than alarming,
+	// and the running total is the place that difference actually shows.
+	function stepAdv(s) {
+		var r = planRow(s.i);
+		var want = r ? r.adv : null;
+		var html = advText(want, s.count);
+		if (s.gained === undefined || s.gained === null) return html;
+		var got = '<div class="cd-sub cd-ok">got ' + advText(s.gained, s.done || s.count) + '</div>';
+		return (html || '') + got;
+	}
+
+	function stepTable(title, rows, running) {
 		var html = ['<h2>' + title + '</h2>',
 			'<table class="cd-order cd-steps"><tr><th></th><th>Action</th><th colspan="2">Item</th>'
-				+ '<th>n</th><th>Where it stands</th></tr>'];
+				+ '<th>n</th><th>Fullness</th><th>Adventures</th><th>Total</th><th>Where it stands</th></tr>'];
 		rows.forEach(function (s) {
 			var st = STEP_STATE[s.state] || STEP_STATE.ready;
 			html.push('<tr><td class="cd-tick ' + st[1] + '">' + st[0] + '</td>'
@@ -504,6 +556,10 @@
 				// than over the wire, since that is where it already is.
 				+ (noteFor(s.i) ? '<div class="cd-sub">' + esc(noteFor(s.i)) + '</div>' : '') + '</td>'
 				+ '<td class="cd-num">' + (s.done > 0 && s.done < s.count ? s.done + ' of ' + s.count : s.count) + '</td>'
+				+ '<td class="cd-room">' + esc(roomFor(s.i))
+				+ (s.state === 'done' ? ' <span class="cd-ok">\u2713</span>' : '') + '</td>'
+				+ '<td class="cd-num">' + stepAdv(s) + '</td>'
+				+ '<td class="cd-num cd-run">' + running.add(s) + '</td>'
 				+ '<td class="cd-why ' + st[1] + '">' + esc(s.said || st[2]) + '</td></tr>');
 		});
 		html.push('</table>');
@@ -548,9 +604,11 @@
 			html.push('<p class="cd-short">Today’s progress was recorded against a different plan — this one was'
 				+ ' locked again since — so it has been set aside, and every step below reads as not yet done.</p>');
 		}
+		// One running total across both tables: the day does not start again after your turns.
+		var running = runningTotal();
 		[['start', 'The start of the day'], ['end', 'After the day’s turns']].forEach(function (half) {
 			var rows = stepRows.steps.filter(function (s) { return s.phase === half[0]; });
-			if (rows.length) html.push(stepTable(half[1], rows));
+			if (rows.length) html.push(stepTable(half[1], rows, running));
 		});
 		consumeEl.innerHTML = html.join('');
 		fetchFacts(stepRows.steps.map(function (s) { return s.name; }));
