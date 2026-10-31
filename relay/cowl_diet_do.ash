@@ -57,10 +57,21 @@ record dietStep {
 	string phase;    // "start" or "end": the two halves the buttons walk
 	string action;   // eat, drink, chew, use, cast, equip
 	string kind;     // item, skill, familiar, campground
-	string name;
+	string name;     // for showing and for saying what went wrong; never for looking anything up
+	// What the row is, as KoLmafia numbers it. The plan can only name things -- it is built in a
+	// browser out of KoLmafia's own tables -- so a name is what arrives, and a name is resolved
+	// exactly once, when the plan is handed over, and never again. Every judgement and every
+	// action afterwards works from this number.
+	//
+	// The difference matters because to_item() matches loosely. A name this script half-recognises
+	// is a thing it eats: "clock" is a real item and so is "chewing gum on a string", and the
+	// distance between a near miss and the right answer is a turn, a point of fullness or 40,000
+	// meat. Resolving once also means a name that resolves to nothing is said so at the moment the
+	// plan is taken on, rather than discovered with a fork in hand.
+	int id;
 	int count;
 	boolean nightcap; // the one drink meant to take you past your limit
-	string mix;       // a Cup of 13s' three ingredients, "~"-separated
+	string mix;       // a Cup of 13s' three ingredients, as ids, "~"-separated
 	// What the row costs each organ, for all count of it, as the plan worked it out. Carried rather
 	// than read back off the item, because the item does not know: a drink through the mime army
 	// shotglass costs no liver at all, a Cup of 13s is 1 drunk although the Cup itself is an
@@ -97,6 +108,66 @@ item dietExactItem(string name) {
 	return it;
 }
 
+// --- resolving a handed-over plan, once ------------------------------------
+
+// What one record names, as a number: an item, a skill or a familiar by its kind. 0 when the name
+// resolves to nothing, which the caller reports rather than storing.
+int dietIdOf(string kind, string name) {
+	if (kind == "skill") {
+		skill sk = name.to_skill();
+		return sk != $skill[none] && sk.to_string() == name ? sk.to_int() : 0;
+	}
+	if (kind == "familiar") {
+		familiar fam = name.to_familiar();
+		return fam != $familiar[none] && fam.to_string() == name ? fam.to_int() : 0;
+	}
+	// Everything else is an item, the campground row included: the Pork Elf toilet is item 12208,
+	// so it is one fewer thing matched by its name.
+	//
+	// Compared against $item[none] rather than against 0, because KoLmafia numbers that item -1
+	// and "no id" has to be a number the caller can test for. Checking for 0 here let a name that
+	// resolves to nothing through, which is the whole thing this function exists to stop.
+	item it = dietExactItem(name);
+	return it == $item[none] ? 0 : it.to_int();
+}
+
+// The records as handed over, with the id added and the mix turned into ids. Returns "" when
+// something would not resolve, having written the reason into the buffer.
+string dietResolve(string handed, buffer trouble) {
+	buffer out;
+	foreach i, rec in handed.split_string("\\|") {
+		if (rec == "") continue;
+		string [int] f = rec.split_string("\\^");
+		if (count(f) < 10) {
+			trouble.append((trouble.length() > 0 ? "; " : "") + "a step arrived with " + count(f) + " fields");
+			return "";
+		}
+		int id = dietIdOf(f[2], f[3]);
+		if (id < 1) {
+			trouble.append((trouble.length() > 0 ? "; " : "") + "KoLmafia has no " + f[2] + " called \"" + f[3] + "\"");
+			return "";
+		}
+		// The mix goes the same way, and for the same reason: three names that have to come back
+		// as the three numbers the Cup's own form wants.
+		buffer mix;
+		foreach j, one in f[6].split_string(MIX_SEP) {
+			if (one == "") continue;
+			item partItem = dietExactItem(one);
+			int part = partItem == $item[none] ? 0 : partItem.to_int();
+			if (part < 1) {
+				trouble.append((trouble.length() > 0 ? "; " : "") + "the mix names \"" + one + "\", which isn't an item");
+				return "";
+			}
+			mix.append((mix.length() > 0 ? MIX_SEP : "") + part);
+		}
+		if (out.length() > 0) out.append(STEP_SEP);
+		out.append(f[0] + FIELD_SEP + f[1] + FIELD_SEP + f[2] + FIELD_SEP + f[3] + FIELD_SEP + f[4]
+			+ FIELD_SEP + f[5] + FIELD_SEP + mix.to_string() + FIELD_SEP + f[7] + FIELD_SEP + f[8]
+			+ FIELD_SEP + f[9] + FIELD_SEP + id);
+	}
+	return out.to_string();
+}
+
 // --- the kept rows ---------------------------------------------------------
 
 dietStep [int] dietReadSteps() {
@@ -106,9 +177,12 @@ dietStep [int] dietReadSteps() {
 	foreach i, rec in kept.split_string("\\|") {
 		if (rec == "") continue;
 		string [int] f = rec.split_string("\\^");
-		if (count(f) < 10) continue;
-		steps[count(steps)] = new dietStep(f[0], f[1], f[2], f[3], f[4].to_int(), f[5] == "nightcap", f[6],
-			f[7].to_int(), f[8].to_int(), f[9].to_int());
+		// Eleven fields, because the kept records carry the resolved id that the ones handed over
+		// do not. A shorter record is one this script wrote before that was true: dropped rather
+		// than read, since the page hands the plan over again on every visit to the tab.
+		if (count(f) < 11) continue;
+		steps[count(steps)] = new dietStep(f[0], f[1], f[2], f[3], f[10].to_int(), f[4].to_int(),
+			f[5] == "nightcap", f[6], f[7].to_int(), f[8].to_int(), f[9].to_int());
 	}
 	return steps;
 }
@@ -184,6 +258,18 @@ slot dietCupSlot() {
 	return $slot[none];
 }
 
+// A mix, as names, for saying out loud. The ids are what the Cup's own form wants and what
+// everything here looks things up by; a row that reads "mix 706 + 706 + 704" is no use to anybody.
+string dietMixNames(string mix) {
+	buffer out;
+	foreach i, one in mix.split_string(MIX_SEP) {
+		if (one == "") continue;
+		if (out.length() > 0) out.append(" + ");
+		out.append(dietPlain(one.to_int().to_item().to_string()));
+	}
+	return out.to_string();
+}
+
 // How many of something Grab supplies could fetch: the closet, the display case's shelf, and
 // Hagnk's when taking from it is free. Not what is worn, which is no use to a meal, and not the
 // mall, which this tab will never buy from.
@@ -214,10 +300,7 @@ dietVerdict dietDisagrees(string said) {
 }
 
 dietVerdict dietJudgeSkill(dietStep s, int toCome, int done) {
-	skill sk = s.name.to_skill();
-	if (sk == $skill[none] || sk.to_string() != s.name) {
-		return new dietVerdict("no", "KoLmafia has no skill by that name");
-	}
+	skill sk = s.id.to_skill();
 	if (!have_skill(sk)) return new dietVerdict("no", "you don't know it");
 
 	// The Ode is sized rather than simply cast.
@@ -259,10 +342,7 @@ dietVerdict dietJudgeSkill(dietStep s, int toCome, int done) {
 }
 
 dietVerdict dietJudgeFamiliar(dietStep s, int done) {
-	familiar fam = s.name.to_familiar();
-	if (fam == $familiar[none] || fam.to_string() != s.name) {
-		return new dietVerdict("no", "KoLmafia has no familiar by that name");
-	}
+	familiar fam = s.id.to_familiar();
 	if (!have_familiar(fam)) return new dietVerdict("no", "you don't have one");
 	if (fam == $familiar[Cooler Yeti]) {
 		if (get_property("_coolerYetiAdventures").to_boolean()) {
@@ -286,7 +366,7 @@ dietVerdict dietJudgeFamiliar(dietStep s, int done) {
 }
 
 dietVerdict dietJudgeCampground(dietStep s, int done) {
-	if (s.name != "Pork Elf toilet") return new dietVerdict("you", "no way to do this one from here");
+	if (s.id.to_item() != $item[Pork Elf toilet]) return new dietVerdict("you", "no way to do this one from here");
 	if (get_property("_porkElfToiletUsed").to_boolean()) {
 		return new dietVerdict("done", "the toilet's digesting is done for today");
 	}
@@ -313,8 +393,10 @@ dietVerdict dietJudgeCampground(dietStep s, int done) {
 }
 
 dietVerdict dietJudgeItem(dietStep s, int need, int done) {
-	item it = dietExactItem(s.name);
-	if (it == $item[none]) return new dietVerdict("no", "KoLmafia has no item by that name");
+	item it = s.id.to_item();
+	// Belt and braces: nothing unresolvable is ever stored, so this is a check on this script
+	// rather than on the plan.
+	if (it == $item[none]) return new dietVerdict("no", "the kept plan has no item for this row");
 
 	// A wish's target is not in the row -- only the effect's name, in prose, in the note -- and
 	// guessing what to wish for with a charge that costs real meat is not a thing to automate.
@@ -336,7 +418,7 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 
 	// The Cup is mixed from three things rather than drunk out of inventory, so what has to be to
 	// hand is the Cup and the three, not a drink.
-	if (dietPlain(it.to_string()) == "Cup of 13s") {
+	if (it == $item[Cup of 13s]) {
 		// A worn Cup is not a problem, it is a step: it comes off for the mix and goes straight
 		// back on. Said here rather than left as an obstacle because the Cup spends most of its
 		// life equipped -- Booze Drop +60 is not an enchantment anybody takes off for fun -- so
@@ -356,12 +438,10 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 		if (jewels < 1) return new dietVerdict("done", "no jewels left in the Cup today");
 		int [item] wanted;
 		foreach i, one in s.mix.split_string(MIX_SEP) {
-			// Splitting "" gives one empty piece, not none, and an empty name is not a mix of one
+			// Splitting "" gives one empty piece, not none, and an empty piece is not a mix of one
 			// unknown thing -- it is a plan that did not say, which the count below answers for.
 			if (one == "") continue;
-			item part = dietExactItem(one);
-			if (part == $item[none]) return new dietVerdict("no", "the mix names " + one + ", which isn't an item");
-			wanted[part] = wanted[part] + 1;
+			wanted[one.to_int().to_item()] = wanted[one.to_int().to_item()] + 1;
 		}
 		if (count(wanted) == 0) return new dietVerdict("no", "the plan didn't say what to mix");
 		foreach part, n in wanted {
@@ -372,7 +452,7 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 				return new dietVerdict(dietFetchable(part) >= n - part.item_amount() ? "held" : "no", said);
 			}
 		}
-		return new dietVerdict("ready", "mix " + s.mix.replace_string(MIX_SEP, " + ") + "; " + jewels
+		return new dietVerdict("ready", "mix " + dietMixNames(s.mix) + "; " + jewels
 			+ " jewels left today" + cupWorn);
 	}
 
@@ -477,11 +557,22 @@ void dietOpen() {
 		write("{\"ok\":false,\"error\":\"The locked plan has no rows in it.\"}");
 		return;
 	}
+	// Names become numbers here and nowhere else. A plan with a name in it that KoLmafia does not
+	// know is refused now, with the name, rather than kept and found out one row at a time.
+	buffer trouble;
+	string resolved = dietResolve(steps, trouble);
+	if (resolved == "") {
+		print("Diet Planner: would not take the plan on -- " + trouble, "red");
+		write("{\"ok\":false,\"error\":" + dietQuoted("This plan has something KoLmafia can't place: "
+			+ trouble + ".") + "}");
+		return;
+	}
+
 	// Arriving on the tab hands the same rows over again, so only a list that actually changed is
 	// worth a line in the gCLI -- and one that changed is very much worth it, since it means the
 	// plan being carried out is not the plan it was.
-	boolean fresh = steps != get_property(DIET_STEPS) || at != get_property(DIET_STEPS_AT);
-	set_property(DIET_STEPS, steps);
+	boolean fresh = resolved != get_property(DIET_STEPS) || at != get_property(DIET_STEPS_AT);
+	set_property(DIET_STEPS, resolved);
 	set_property(DIET_STEPS_AT, at);
 
 	dietStep [int] kept = dietReadSteps();
