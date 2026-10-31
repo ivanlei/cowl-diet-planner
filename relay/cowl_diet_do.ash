@@ -356,6 +356,9 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 		if (jewels < 1) return new dietVerdict("done", "no jewels left in the Cup today");
 		int [item] wanted;
 		foreach i, one in s.mix.split_string(MIX_SEP) {
+			// Splitting "" gives one empty piece, not none, and an empty name is not a mix of one
+			// unknown thing -- it is a plan that did not say, which the count below answers for.
+			if (one == "") continue;
 			item part = dietExactItem(one);
 			if (part == $item[none]) return new dietVerdict("no", "the mix names " + one + ", which isn't an item");
 			wanted[part] = wanted[part] + 1;

@@ -68,6 +68,57 @@ assert.strictEqual(caps[0].action, 'drink');
 assert.strictEqual(caps[0].phase, 'end');
 assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the morning overdrinks');
 
+// A plan locked before rows carried a phase is brought up to date in place, because unlocking to
+// get the field back would plan again on today's prices -- which is the very thing Lock was
+// keeping. Round-tripped against the generator: strip the three fields off a real plan and the
+// upgrade has to put back exactly what dayRows produced, row for row.
+{
+	const bare = JSON.parse(JSON.stringify(rows));
+	bare.forEach(r => { delete r.phase; delete r.nightcap; delete r.mix; });
+	const cap = rows.filter(r => r.nightcap)[0];
+	const kept = rows.filter(r => /Stooper out/.test(r.note || ''))[0];
+	const night = {nightcap: cap ? {name: cap.name} : null, stooper: kept ? {name: kept.name} : null};
+	const up = plan.upgradeRows(bare, night, {});
+	assert.ok(up.ok, 'an older plan upgrades: ' + up.why);
+	assert.deepStrictEqual(up.rows.map(r => r.phase), rows.map(r => r.phase), 'every phase back');
+	assert.deepStrictEqual(up.rows.map(r => !!r.nightcap), rows.map(r => !!r.nightcap), 'the nightcap back');
+
+	// It refuses rather than guesses when its answer disagrees with the plan's own record.
+	assert.strictEqual(plan.upgradeRows(bare, {nightcap: {name: 'not in this plan'}, stooper: null}, {}).ok, false);
+	assert.strictEqual(plan.upgradeRows(bare, {nightcap: null, stooper: null}, {}).ok, false,
+		'a plan that records no nightcap but reads as having one');
+
+	// The Cup's three ingredients, recovered by counting names the plan lists rather than by
+	// splitting the note -- the oldest notes are comma-separated and sixty item names contain a
+	// comma and a space.
+	const into = {'Happy Birthday, Claude! cake': 'the Cup of 13s', 'grease gun': 'the Cup of 13s'};
+	const oldNote = 'mix and drink: grease gun, Happy Birthday, Claude! cake, Happy Birthday, Claude! cake';
+	const cupRows = [{name: 'Cup of 13s', action: 'drink', kind: 'item', count: 1, note: oldNote, room: [0, 1, 0]}];
+	const upCup = plan.upgradeRows(cupRows, {nightcap: null, stooper: null}, into);
+	assert.ok(upCup.ok);
+	assert.deepStrictEqual(upCup.rows[0].mix.slice().sort(),
+		['Happy Birthday, Claude! cake', 'Happy Birthday, Claude! cake', 'grease gun'].sort(),
+		'a comma in an item name does not split it in two');
+	// and the newer note shape, with counts and tiers
+	const newNote = 'mix and drink 2 × grease gun + Happy Birthday, Claude! cake (tier 3): the Cup takes almost anything';
+	const upNew = plan.upgradeRows([Object.assign({}, cupRows[0], {note: newNote})], {nightcap: null, stooper: null}, into);
+	assert.deepStrictEqual(upNew.rows[0].mix.slice().sort(),
+		['Happy Birthday, Claude! cake', 'grease gun', 'grease gun'].sort(), 'counts and tiers too');
+
+	// The oldest plans carry no `into` at all, so the note's own separators are all there is. That
+	// works until a name has a comma in it, and then the count is what catches it: the Cup takes
+	// exactly three things, so a split that doesn't come out at three has read a name in half and
+	// is refused rather than mixed wrongly.
+	const plain = 'mix and drink: grease gun, second-hand synthetic sloth skin scabbard, second-hand synthetic sloth skin scabbard';
+	const upPlain = plan.upgradeRows([Object.assign({}, cupRows[0], {note: plain})], {nightcap: null, stooper: null}, null);
+	assert.deepStrictEqual(upPlain.rows[0].mix,
+		['grease gun', 'second-hand synthetic sloth skin scabbard', 'second-hand synthetic sloth skin scabbard'],
+		'no into, and the note splits cleanly');
+	const upAmbiguous = plan.upgradeRows([cupRows[0]], {nightcap: null, stooper: null}, null);
+	assert.strictEqual(upAmbiguous.rows[0].mix, undefined, 'a comma in a name is refused, not guessed');
+	assert.ok(/doesn.t say what to mix/.test(upAmbiguous.why), 'and it says so');
+}
+
 // Handing a plan to cowl_diet_do.ash: one record per step, "^" between fields and "|" between
 // steps, in the order that script reads them. Pinned because the two have to agree exactly, and a
 // field slipping a place would have it eating the wrong row.
