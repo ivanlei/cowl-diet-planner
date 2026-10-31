@@ -55,6 +55,7 @@
 	var consumeCheckBtn = document.getElementById('cd-consume-check');
 	var consumeForgetBtn = document.getElementById('cd-consume-forget');
 	var consumeGrabBtn = document.getElementById('cd-consume-grab');
+	var consumeBreakfastBtn = document.getElementById('cd-consume-breakfast');
 	var tabBar = document.getElementById('cd-tabs');
 
 	var STORE = 'cowlDiet';
@@ -78,6 +79,7 @@
 	var shelfName = '', shelvesAsked = false;  // the storage shelf, by name
 	var stepRows = null, stepsBusy = false;    // the Consume tab: where the locked plan stands
 	var grabArmed = null;                      // Grab supplies, dry-run once and waiting for a second press
+	var walkArmed = '';                        // a phase that has been dry-walked and is waiting for a second press
 	var upgraded = '', lockedTooOld = '';      // an older locked plan, brought up to date or not
 
 	function esc(s) {
@@ -428,6 +430,99 @@
 		consumeCheckBtn.disabled = stepsBusy || !locked;
 		consumeForgetBtn.disabled = stepsBusy || !locked;
 		if (consumeGrabBtn) consumeGrabBtn.disabled = stepsBusy || !stepRows;
+		if (consumeBreakfastBtn) consumeBreakfastBtn.disabled = stepsBusy || !stepRows;
+	}
+
+	// --- carrying out a half of the day ------------------------------------------------
+	//
+	// One request per step, so the table can tick off in front of you and a failure stops where it
+	// happened. The walk goes round more than once on purpose: the plan's own cleaners free room
+	// that earlier rows need, so a step that does not fit yet is stepped over and come back to on
+	// the next pass. It stops when a pass does nothing, which is the only honest end condition --
+	// counting passes would stop a day that was still making progress.
+	var WALK_PASSES = 6;
+
+	function disarmWalk() {
+		walkArmed = '';
+		if (consumeBreakfastBtn) {
+			consumeBreakfastBtn.textContent = 'Breakfast';
+			consumeBreakfastBtn.className = 'cd-refresh';
+		}
+	}
+
+	// Every step of a phase still worth attempting, in the plan's order.
+	function phaseQueue(phase) {
+		return stepRows.steps.filter(function (s) {
+			return s.phase === phase && !s.nightcap && s.state !== 'done' && s.state !== 'you';
+		}).map(function (s) { return s.i; });
+	}
+
+	function walkPhase(phase, dry) {
+		var did = 0, failed = null, skipped = 0, passes = 0;
+		function onePass() {
+			var before = did;
+			passes++;
+			return phaseQueue(phase).reduce(function (chain, i) {
+				return chain.then(function () {
+					if (failed) return null;
+					return api('cowl_diet_do.ash', {action: 'step', i: i, dry: dry ? 1 : 0}).then(function (res) {
+						if (!res.ok) { failed = {i: i, why: res.error}; return; }
+						if (res.skipped) { skipped++; return; }
+						did += res.did || 0;
+					});
+				});
+			}, Promise.resolve()).then(function () {
+				if (failed || passes >= WALK_PASSES) return null;
+				// A dry walk cannot change anything, so going round again would say the same thing
+				// twice; it is the real one that needs the second look.
+				if (dry) return null;
+				return api('cowl_diet_do.ash', {action: 'check', quiet: 1}).then(function (res) {
+					if (!res.ok) throw new Error(res.error);
+					stepRows = res;
+					if (did > before) return onePass();
+					return null;
+				});
+			});
+		}
+		return onePass().then(function () { return {did: did, failed: failed, skipped: skipped, passes: passes}; });
+	}
+
+	function breakfast() {
+		var dry = walkArmed !== 'start';
+		stepsBusy = true;
+		consumeButtons();
+		consumeSay(dry ? 'Reading the morning through\u2026' : 'Doing it\u2026');
+		walkPhase('start', dry).then(function (out) {
+			stepsBusy = false;
+			if (dry) {
+				walkArmed = 'start';
+				consumeBreakfastBtn.textContent = 'Do it';
+				consumeBreakfastBtn.className = 'cd-refresh cd-go';
+				consumeButtons();
+				// A dry walk changes nothing, so it cannot free the fullness the toilet wants or the
+				// spleen the mojo filters free -- which means its count is a floor and the steps
+				// waiting on those read as not ready. Said, rather than left to look like a problem.
+				consumeSay((out.failed ? 'Would stop at step ' + (out.failed.i + 1) + ': ' + out.failed.why + '. '
+					: 'The morning reads through: at least ' + out.did + ' things would go down'
+						+ (out.skipped ? ', ' + out.skipped + ' not ready yet' : '') + '. ')
+					+ (out.skipped || out.failed ? '' : '')
+					+ 'A dry run can\u2019t actually free any room, so anything waiting on the toilet or a cleaner reads'
+					+ ' as not ready here; the real run goes round again and picks those up. Nothing has been done'
+					+ ' \u2014 press <b>Do it</b> to carry it out. The gCLI has every step.',
+					!!out.failed, true);
+				return;
+			}
+			disarmWalk();
+			var said = out.failed
+				? 'Stopped at step ' + (out.failed.i + 1) + ': ' + out.failed.why + ' \u2014 the gCLI says more.'
+				: 'Breakfast done: ' + out.did + ' things, in ' + out.passes + (out.passes === 1 ? ' pass' : ' passes') + '.';
+			consumeSoon(true, said, !!out.failed);
+		}).catch(function (e) {
+			stepsBusy = false;
+			disarmWalk();
+			consumeButtons();
+			consumeSay(e.message || 'KoLmafia didn\u2019t answer.', true);
+		});
 	}
 
 	// Grab supplies, in two presses rather than behind a dialog.
@@ -525,6 +620,7 @@
 			return;
 		}
 		disarmGrab();
+		disarmWalk();
 		stepsBusy = true;
 		consumeButtons();
 		// What the table said a moment ago, so that pressing Check can report what moved. Arriving
@@ -694,6 +790,7 @@
 
 	function forgetProgress() {
 		disarmGrab();
+		disarmWalk();
 		// Said out loud rather than returned on quietly. A browser that suppresses dialogs answers
 		// no without showing one, and a button that then does nothing and says nothing is the same
 		// button as a broken one -- which is how the dialog on Grab supplies was found.
@@ -1104,6 +1201,7 @@
 	if (consumeCheckBtn) consumeCheckBtn.addEventListener('click', function () { consumeSoon(false); });
 	if (consumeForgetBtn) consumeForgetBtn.addEventListener('click', forgetProgress);
 	if (consumeGrabBtn) consumeGrabBtn.addEventListener('click', grabSupplies);
+	if (consumeBreakfastBtn) consumeBreakfastBtn.addEventListener('click', breakfast);
 	tabBar.addEventListener('click', function (e) {
 		var b = e.target.closest && e.target.closest('[data-tab]');
 		if (!b) return;
