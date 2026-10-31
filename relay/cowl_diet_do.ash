@@ -170,6 +170,20 @@ int dietDrunkToCome(dietStep [int] steps, int [int] done) {
 
 // --- judging one row -------------------------------------------------------
 
+// Which slot the Cup of 13s is being worn in, or $slot[none] if it isn't.
+//
+// The Cup is an off-hand and the thing that opens it is a link on the inventory page, so a Cup
+// that is being worn is a Cup the link is not beside: item_amount() counts inventory alone. That
+// makes taking it off part of using it, and putting it back afterwards needs the slot it came out
+// of rather than an assumption -- an off-hand is also what a Left-Hand Man wears, so "the off-hand
+// slot" is the usual answer and not the only one.
+slot dietCupSlot() {
+	foreach s in $slots[] {
+		if (equipped_item(s) == $item[Cup of 13s]) return s;
+	}
+	return $slot[none];
+}
+
 // How many of something Grab supplies could fetch: the closet, the display case's shelf, and
 // Hagnk's when taking from it is free. Not what is worn, which is no use to a meal, and not the
 // mall, which this tab will never buy from.
@@ -323,18 +337,20 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 	// The Cup is mixed from three things rather than drunk out of inventory, so what has to be to
 	// hand is the Cup and the three, not a drink.
 	if (dietPlain(it.to_string()) == "Cup of 13s") {
-		// The Cup is an off-hand, and the thing that opens it is a link on the inventory page -- so
-		// one that is being worn is one the link is not next to. Worth saying plainly, because the
-		// Cup spends most of its life equipped.
+		// A worn Cup is not a problem, it is a step: it comes off for the mix and goes straight
+		// back on. Said here rather than left as an obstacle because the Cup spends most of its
+		// life equipped -- Booze Drop +60 is not an enchantment anybody takes off for fun -- so
+		// "take it off first" would be an instruction given every single day.
+		string cupWorn = "";
 		if (it.item_amount() < 1) {
-			if (it.equipped_amount() > 0) {
-				return new dietVerdict("held", "you're wearing it, and the Cup is opened from a link on the "
-					+ "inventory page: take it off first");
+			slot worn = dietCupSlot();
+			if (worn == $slot[none]) {
+				if (dietFetchable(it) > 0) {
+					return new dietVerdict("held", "it's not to hand: " + dietWhereElse(it));
+				}
+				return new dietVerdict("no", "you don't have one");
 			}
-			if (dietFetchable(it) > 0) {
-				return new dietVerdict("held", "it's not to hand: " + dietWhereElse(it));
-			}
-			return new dietVerdict("no", "you don't have one");
+			cupWorn = "; it comes off your " + worn + " for the mix and goes straight back on";
 		}
 		int jewels = get_property("_cupOf13sJewels").to_int();
 		if (jewels < 1) return new dietVerdict("done", "no jewels left in the Cup today");
@@ -354,7 +370,7 @@ dietVerdict dietJudgeItem(dietStep s, int need, int done) {
 			}
 		}
 		return new dietVerdict("ready", "mix " + s.mix.replace_string(MIX_SEP, " + ") + "; " + jewels
-			+ " jewels left today");
+			+ " jewels left today" + cupWorn);
 	}
 
 	// Short in inventory is two different situations, and the table is only worth reading if it
