@@ -55,6 +55,19 @@ assert.ok(Math.abs(rows.reduce((s, r) => s + r.cost, 0) - p55[1]) < 1e-6, 'rows 
 assert.strictEqual(rows[0].action, 'cast', 'Ode comes first');
 assert.ok(/nightcap/.test(rows[rows.length - 1].note), 'the nightcap comes last');
 
+// Which half of the day each row belongs to, which is what the Consume tab's two buttons walk.
+// Every row says, the two halves are contiguous (start then end, never interleaved), and the
+// nightcap -- the one drink meant to take you past your limit -- is marked as itself.
+assert.ok(rows.every(r => r.phase === 'start' || r.phase === 'end'), 'every row has a phase');
+const firstEnd = rows.findIndex(r => r.phase === 'end');
+assert.ok(firstEnd > 0, 'the day starts before it ends');
+assert.ok(rows.slice(firstEnd).every(r => r.phase === 'end'), 'the end of the day is the tail of the table');
+const caps = rows.filter(r => r.nightcap);
+assert.strictEqual(caps.length, 1, 'one nightcap');
+assert.strictEqual(caps[0].action, 'drink');
+assert.strictEqual(caps[0].phase, 'end');
+assert.ok(!rows.some(r => r.phase === 'start' && r.nightcap), 'nothing in the morning overdrinks');
+
 // The Cup of 13s: a 5 + 5 + 3 mix is 13 adventures for 1 drunk, and worth having at 55k.
 const withCup = JSON.parse(JSON.stringify(data));
 withCup.account.cup = true;
@@ -64,6 +77,10 @@ const cupPlan = plan.planFor(plan.sweep(cupCfg), 55000);
 const cupRow = plan.dayRows(cupPlan[2], cupCfg).find(r => r.name === 'Cup of 13s');
 assert.ok(cupRow && cupRow.adv === 13 && cupRow.room[1] === 1, 'the Cup is a 13-adventure, 1-drunk drink');
 assert.ok(cupPlan[0] > p[0], 'and it adds adventures');
+// and it carries the three things to mix, which is all a script needs to actually make it
+assert.deepStrictEqual(cupRow.mix, ['porquoise', 'porquoise', 'goat'], 'the mix, 5 + 5 + 3');
+assert.ok(cupRow.mix.every(n => withCup.cup.tiers[5].concat(withCup.cup.tiers[3]).some(t => t.name === n)),
+	'and every one of them is a thing the Cup takes');
 
 // What the mall has: a plan can't take more than is for sale, pays for the units it takes, and
 // can't use what nobody sells. Sacramento wine with 15 for sale, Psychotic Train wine with none.

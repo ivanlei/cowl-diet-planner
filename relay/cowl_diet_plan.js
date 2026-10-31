@@ -796,12 +796,25 @@
 	}
 
 	// The plan as the rows of a table, in the order to do things:
-	// {action, name, kind, count, adv, parts, room, cost, note}. name is the thing to decorate: an
+	// {action, name, kind, count, adv, parts, room, cost, note, phase}. name is the thing to decorate: an
 	// item, or a skill, effect or familiar (kind says which). adv, room and cost are for all count of
 	// them; parts is one's breakdown. A dieting pill and the food it doubles are two rows, as are
 	// the day's last 1-drunk drink, kept back for the Stooper, and the rest of its kind.
 	// "mix and drink grease gun (tier 5) + 2 × second-hand synthetic sloth skin scabbard (tier 4)":
 	// the Cup takes almost anything with a tier, equipment included, which can look like a mistake.
+	//
+	// phase says which half of the day a row belongs to: 'end' for the four rows that happen after
+	// the day's turns are played -- the 1-drunk drink kept back for the Stooper, the nightcap, and
+	// the two Cooler Yeti conversations around them -- and 'start' for everything else. Said here
+	// rather than worked out later from the note text, because this function is where the reason
+	// each row sits where it does is actually known, and a second reading of "before your last
+	// turns" somewhere else is a second place to get it wrong.
+	//
+	// Two more fields appear only on the rows that need them, for the same reason: mix, the Cup of
+	// 13s' three ingredients (see cupMix below), and nightcap, true on the one drink that is meant
+	// to take you past your limit. Anything carrying out a plan has to tell that drink from every
+	// other drink in it, and "the note begins with the word nightcap" is not a thing to bet a
+	// liver on.
 	function cupNote(label, cfg) {
 		var tier = {}, n = {}, order = [];
 		if (cfg.cup && cfg.cup.tiers) {
@@ -814,6 +827,19 @@
 		return 'mix and drink ' + order.map(function (x) {
 			return (n[x] > 1 ? n[x] + ' \u00d7 ' : '') + x + (tier[x] ? ' (tier ' + tier[x] + ')' : '');
 		}).join(' + ') + ': the Cup takes almost anything with a tier, equipment too, and adds the tiers';
+	}
+
+	// The three things that go in the Cup, off the unit's own label.
+	//
+	// The label is built by joining the chosen tiers' names with " + " (see the Cup's units above),
+	// so splitting on " + " gives them back exactly -- no KoL item name contains that sequence. The
+	// row carries them as a list because mixing the drink needs three item names and nothing else
+	// in the row has them: cupNote() above turns them into a sentence with counts and tiers in it,
+	// and a script that had to read that sentence back into three names would be one bad name away
+	// from mixing the wrong thing.
+	function cupMix(label) {
+		var m = /^Cup of 13s \((.*)\)$/.exec(label);
+		return m ? m[1].split(' + ') : [];
 	}
 
 	function dayRows(units, cfg) {
@@ -831,16 +857,27 @@
 		}
 		function times(v, n) { return v.map(function (x) { return x * n || 0; }); }  // || 0: no -0
 		var rows = [];
+		// Every row goes through here, so that a row added later cannot arrive without a phase:
+		// the day's start is the default, and the four rows after the day's turns say so for
+		// themselves. A row with no phase at all would be walked by neither of the Consume tab's
+		// buttons and would simply never happen, which is the one failure that looks like nothing.
+		function push(r) {
+			if (!r.phase) r.phase = 'start';
+			rows.push(r);
+		}
 		function add(action, u, n, note, over) {
 			var r = {action: action, name: base(u[0]), kind: 'item', count: n, adv: u[3] * n, parts: u[5],
 				room: times(u[6], n), cost: u[4] * n, note: note || ''};
 			var helpers = u[0].indexOf('Cup of 13s') === 0 ? [] : helpersOf(u[0]);  // its parts are ingredients
 			if (helpers.length) r.note = (r.note ? r.note + '; ' : '') + 'with ' + helpers.join(' and ');
 			Object.keys(over || {}).forEach(function (k) { r[k] = over[k]; });
-			rows.push(r);
+			push(r);
 		}
-		function info(action, name, kind, note) {
-			rows.push({action: action, name: name, kind: kind, count: 1, adv: null, parts: [], room: [0, 0, 0], cost: 0, note: note});
+		function info(action, name, kind, note, over) {
+			var r = {action: action, name: name, kind: kind, count: 1, adv: null, parts: [], room: [0, 0, 0],
+				cost: 0, note: note};
+			Object.keys(over || {}).forEach(function (k) { r[k] = over[k]; });
+			push(r);
 		}
 		function starts(names) { return function (u) { return names.some(function (x) { return u[0].indexOf(x) === 0; }); }; }
 
@@ -869,7 +906,7 @@
 		});
 		take(starts(['dieting pill + '])).forEach(function (e) {
 			var u = e[0], n = e[1], food = u[0].replace('dieting pill + ', '');
-			rows.push({action: 'use', name: 'dieting pill', kind: 'item', count: n, adv: null, parts: [],
+			push({action: 'use', name: 'dieting pill', kind: 'item', count: n, adv: null, parts: [],
 				room: [0, 0, 3 * n], cost: cfg.pill * n, note: 'just before the food it doubles'});
 			add('eat', [food].concat(u.slice(1)), n, 'doubled by the dieting pill: twice the fullness and adventures',
 				{room: [u[6][0] * n, 0, 0], cost: (u[4] - cfg.pill) * n});
@@ -877,7 +914,7 @@
 		take(function (u) { return /\(Digestion\)$/.test(u[0]); }).forEach(function (e) {
 			add('eat', e[0], e[1], 'then pick With my Spleen: −1 fullness, +1 spleen', {room: [0, 0, e[1]]});
 		});
-		if (cfg.toilet) rows.push({action: 'use', name: 'Pork Elf toilet', kind: 'campground', count: 1, adv: null, parts: [],
+		if (cfg.toilet) push({action: 'use', name: 'Pork Elf toilet', kind: 'campground', count: 1, adv: null, parts: [],
 			room: [-1, 0, 0], cost: 0, note: 'rest once after 2 fullness, and eat into the room'});
 		// chew
 		take(function (u) { return u[1] === 'spleen'; }).forEach(function (e) { add('chew', e[0], e[1]); });
@@ -900,7 +937,7 @@
 			[['Cup of 13s'], 'drink', '']].forEach(function (c) {
 			take(starts(c[0])).forEach(function (e) {
 				if (e[0][0].indexOf('Cup of 13s') === 0) {
-					add('drink', e[0], e[1], cupNote(e[0][0], cfg), {name: 'Cup of 13s'});
+					add('drink', e[0], e[1], cupNote(e[0][0], cfg), {name: 'Cup of 13s', mix: cupMix(e[0][0])});
 				} else {
 					add(c[1], e[0], e[1], c[2]);
 				}
@@ -908,12 +945,16 @@
 		});
 		take(function (u) { return u[1] === 'extra'; }).forEach(function (e) { add('use', e[0], e[1], 'any time'); });
 		// end of day
-		if (kept) add('drink', kept, 1, 'before your last turns: put the Stooper out, drink it, and play them with it still out');
+		if (kept) add('drink', kept, 1, 'before your last turns: put the Stooper out, drink it, and play them with it still out',
+			{phase: 'end'});
 		var nc = take(function (u) { return u[1] === 'nightcap'; });
 		var ncYeti = nc.some(function (e) { return e[0][0].indexOf('[yeti]') >= 0; });
-		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap');
-		nc.forEach(function (e) { add('drink', e[0], e[1], 'nightcap: after the day’s turns; leaves you falling-down drunk'); });
-		if (morning.length) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), for tomorrow’s first drink');
+		if (ncYeti) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), just before the nightcap',
+			{phase: 'end'});
+		nc.forEach(function (e) { add('drink', e[0], e[1], 'nightcap: after the day’s turns; leaves you falling-down drunk',
+			{phase: 'end', nightcap: true}); });
+		if (morning.length) info('use', 'Cooler Yeti', 'familiar', 'chat: Make my next drink impossibly cold! (400 XP), for tomorrow’s first drink',
+			{phase: 'end'});
 		groups.forEach(function (e) { add('use', e[0], e[1]); });  // anything not placed above
 		return rows;
 	}
