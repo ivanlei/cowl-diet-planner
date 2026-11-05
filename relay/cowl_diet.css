@@ -205,3 +205,17 @@ table.cd-camp, table.cd-rumpus { width: auto; }
 	.cd-why { max-width: none; }
 	table.cd-order { font-size: 12px; }
 }
+
+/* --- Mafia wines and Martinis -----------------------------------------------
+ *
+ * The plan's own table (.cd-order) with sortable headings. 112 rows in KoLmafia's item order is a
+ * list nobody can use, so every column sorts; the arrow is in a span of its own and always present
+ * in the markup, so turning a column does not shift the heading beside it by an arrow's width. */
+.cd-booze { margin-top: 6px; }
+.cd-booze th.cd-sortable { cursor: pointer; user-select: none; }
+.cd-booze th.cd-sortable:hover { color: var(--cd-big); }
+.cd-booze th.cd-sorted { color: var(--cd-big); }
+.cd-booze th[data-sort]:not([data-sort="name"]) { text-align: right; }
+.cd-arrow { display: inline-block; width: 1em; font-size: 9px; vertical-align: middle; }
+/* The subtext is a sentence, not a column: it may wrap, and the name cell is what gives. */
+.cd-booze .cd-item { min-width: 220px; max-width: 34em; }

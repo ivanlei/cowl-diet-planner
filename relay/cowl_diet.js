@@ -49,6 +49,7 @@
 	var planBtn = document.getElementById('cd-plan');
 	var lockSaid = document.getElementById('cd-lock-said');
 	var rollEl = document.getElementById('cd-rollover');
+	var wineEl = document.getElementById('cd-wines'), martiniEl = document.getElementById('cd-martinis');
 	var shopEl = document.getElementById('cd-shop');
 	var consumeEl = document.getElementById('cd-consume');
 	var consumeSaidEl = document.getElementById('cd-consume-said');
@@ -62,7 +63,7 @@
 	var MARKET_STORE = 'cowlDietMarket', MARKET_HOURS = 3;
 	var PRESETS = [25000, 55000, 100000, 250000, 500000, 1000000];
 	var CURVE = [10000, 25000, 55000, 100000, 250000, 500000, 1000000, 2000000];
-	var TABS = ['rollover', 'diet', 'shopping', 'consume'];
+	var TABS = ['rollover', 'diet', 'shopping', 'consume', 'wines', 'martinis'];
 	var WIKI = 'https://wiki.kingdomofloathing.com/index.php?go=Go&search=';
 	var ORGANS = ['fullness', 'drunk', 'spleen'];
 
@@ -72,6 +73,7 @@
 	var dirty = true;    // the switches or rollover have changed since the plan on screen
 	var DONE = 'Every item in this plan is for sale today, priced for the quantity it takes.';
 	var rollSum = null, rollApi = null;  // the rollover section's count, once it's drawn
+	var boozeAsked = false;              // the wines and martinis tables, fetched on first sight
 	var tab = 'diet';
 	var locked = null;   // the locked plan, while there is one: what's drawn instead of planning
 	var shown = null;    // the plan on screen, live or saved, for the shopping tab
@@ -909,6 +911,24 @@
 		});
 		if (tab === 'shopping') shopSoon(0);
 		if (tab === 'consume') consumeSoon(true);
+		if (tab === 'wines' || tab === 'martinis') fetchBooze();
+	}
+
+	// The wines and martinis tables: 148 rows that never change under a plan, so they are read once,
+	// the first time one of the two tabs is opened, and both are drawn from that one answer. A page
+	// that never opens either costs nothing for them.
+	function fetchBooze() {
+		if (boozeAsked || !window.cowlDietBooze) return;
+		boozeAsked = true;
+		api('cowl_diet_booze.ash', {}).then(function (res) {
+			if (!res.ok) throw new Error(res.error || '');
+			window.cowlDietBooze.mount(wineEl, martiniEl, res);
+		}).catch(function () {
+			boozeAsked = false;   // a failed read is worth trying again on the next visit to the tab
+			var said = '<p class="cd-said">KoLmafia didn\u2019t answer. Open the tab again to try once more.</p>';
+			if (wineEl) wineEl.innerHTML = said;
+			if (martiniEl) martiniEl.innerHTML = said;
+		});
 	}
 
 	// Pictures and description ids for names, asked once each; the plan and the shopping list are
