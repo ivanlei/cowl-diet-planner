@@ -32,7 +32,9 @@ void main() {
 		+ "<button type='button' role='tab' class='cd-tab cd-on' data-tab='rollover' aria-selected='true'>Rollover</button>"
 		+ "<button type='button' role='tab' class='cd-tab' data-tab='diet' aria-selected='false'>Diet</button>"
 		+ "<button type='button' role='tab' class='cd-tab' data-tab='shopping' aria-selected='false'>Shopping</button>"
-		+ "<button type='button' role='tab' class='cd-tab' data-tab='consume' aria-selected='false'>Consume</button></div>\n");
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='consume' aria-selected='false'>Consume</button>"
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='wines' aria-selected='false'>Mafia wines</button>"
+		+ "<button type='button' role='tab' class='cd-tab' data-tab='martinis' aria-selected='false'>Martinis</button></div>\n");
 	out.append("<div id='cd-tab-diet' class='cd-pane' role='tabpanel' hidden>\n");
 
 	out.append("<div class='cd-controls'>\n");
@@ -89,10 +91,29 @@ void main() {
 		+ " dry run and the second does it. It never drinks the nightcap \u2014 that is a button of its own, still to"
 		+ " come.</p>\n");
 	out.append("</div>\n");
+
+	// Two reference tables rather than anything that plans: every booze the mafia pinky ring adds
+	// adventures to, and every one the tuxedo shirt does. They are read once, the first time one of
+	// the tabs is opened, so a page that never looks at them costs nothing.
+	out.append("<div id='cd-tab-wines' class='cd-pane' role='tabpanel' hidden>\n");
+	out.append("<div id='cd-wines'><p class='cd-said'>Reading KoLmafia's tables...</p></div>\n");
+	out.append("<p class='cd-note'>Every booze KoLmafia flags <b>WINE</b> \u2014 which is what the mafia pinky ring"
+		+ " and Refined Palate add adventures to. The adventures, and both averages, include whichever of those is"
+		+ " in force for you right now. <b>Mall</b> is KoLmafia's recorded price, not a fresh look at the mall;"
+		+ " <b>Have</b> counts your inventory, closet, Hagnk's and your display case.</p>\n");
+	out.append("</div>\n");
+
+	out.append("<div id='cd-tab-martinis' class='cd-pane' role='tabpanel' hidden>\n");
+	out.append("<div id='cd-martinis'><p class='cd-said'>Reading KoLmafia's tables...</p></div>\n");
+	out.append("<p class='cd-note'>Every booze KoLmafia flags <b>MARTINI</b> \u2014 which is what the <b>tuxedo"
+		+ " shirt</b> adds 1 to 3 adventures to, not the pinky ring. The same columns as the wines, on the same"
+		+ " terms.</p>\n");
+	out.append("</div>\n");
 	out.append("</div>\n");
 
 	out.append("<script type='text/javascript' src='" + dietAsset("cowl_diet_plan.js") + "'></script>\n");
 	out.append("<script type='text/javascript' src='" + dietAsset("cowl_diet_rollover.js") + "'></script>\n");
+	out.append("<script type='text/javascript' src='" + dietAsset("cowl_diet_booze.js") + "'></script>\n");
 	out.append("<script type='text/javascript' src='" + dietAsset("cowl_diet.js") + "'></script>\n");
 	out.append("</body></html>\n");
 	out.write();

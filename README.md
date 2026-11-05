@@ -5,13 +5,16 @@ consumption and it works out the most adventures that buys — what to eat, drin
 cleaners, the once-a-day boosters and a nightcap, and the order to do it in. It never buys or eats
 anything; the one thing it moves is the diet's things onto a display case shelf, when you ask it to.
 
-It has three tabs:
+It has six tabs:
 
 - **Rollover** — the gear, campground and clan furniture that add adventures each night, the best
   there is beside what you have, and tonight's bank against the 200 cap, which sizes the nightcap.
 - **Diet** — the plan for a budget, checked against the mall so that everything in it is for sale
   today, in the quantity it takes, priced for that quantity.
 - **Shopping** — the plan times a number of days, less what you already have.
+- **Consume** — carrying out the plan you locked: where the day stands, grabbing the supplies, and
+  breakfast.
+- **Mafia wines** and **Martinis** — two reference tables, below.
 
 Set up the Rollover tab and the Diet tab's budget and switches, then press **Plan**: nothing is
 planned until you do.
@@ -27,6 +30,32 @@ wiki, so it stays in step with the game. "Own" counts your display case as well 
 closet, storage and clan stash: KoLmafia's `have_outfit` does not look in the museum, and a
 costume collection kept there would otherwise read as owning nothing.
 
+
+## Mafia wines and Martinis
+
+Two tables, neither of which plans anything: every booze KoLmafia flags **WINE** in its own
+`inebriety.txt` — which is what the mafia pinky ring and Refined Palate add adventures to — and
+every one it flags **MARTINI**, which is what the **tuxedo shirt** adds 1 to 3 adventures to. 112
+and 36 of them, and nothing is in both. Taken from the flag rather than from a list of names here,
+so the 149th is covered the week KoL adds it.
+
+The columns are the drink, the liver it costs, the adventures it gives, the adventures per point of
+liver, KoLmafia's recorded mall price, the adventures per meat at that price, and how many you have
+(inventory, closet, Hagnk's and your display case). Every column sorts; it opens on adventures per
+point of liver, biggest first, which is the question a diet planner asks — the liver is what runs
+out, not the meat.
+
+**The figures are the boosted ones**, by the same rule the drinking follows: the ring equipped or
+`autoPinkyRing` set with the ring to hand, Refined Palate up, the shirt equipped or `autoTuxedo` set
+with the shirt to hand. A line above each table says which of those is in force. A wine's average is
+**not** the midpoint of its range — the ring's bonus is a rounded eighth and so steps, and a 9-12
+wine with the ring on rolls 10, 11, 12 or 14, never 13 — so the average is taken over every roll in
+the range, which is what KoLmafia does. A martini's average *is* the midpoint, because the shirt's
+bonus is flat.
+
+Nothing here asks the mall: the price is `historical_price`, KoLmafia's record, because 148 drinks
+drawn on opening a tab is not 148 requests. The Diet tab's **Update prices from the mall** button is
+the one that asks, and only about what a plan picked.
 
 ## Install
 
@@ -232,12 +261,13 @@ switches, tab and days, and the mall's answers for three hours.
 
 - `relay/relay_Diet_Planner.ash` — the page; `cowl_diet.js` and `cowl_diet.css` draw it.
 - `relay/cowl_diet_plan.js` — the planner, with no page in it so node can test it;
-  `cowl_diet_rollover.js` — the Rollover tab.
+  `cowl_diet_rollover.js` — the Rollover tab; `cowl_diet_booze.js` — the two reference tables.
 - `relay/cowl_diet_data.ash` (organs, what you own, the priced menu), `cowl_diet_price.ash` (the mall
   check), `cowl_diet_refresh.ash` (the prices button), `cowl_diet_rollover.ash` (the rollover
   catalogue), `cowl_diet_shop.ash` (the shopping list), `cowl_diet_shelf.ash` (the storage shelf: the
   display case's shelves, and moving things onto one), `cowl_diet_items.ash` (pictures and
-  description ids), `cowl_diet_save.ash` (the preferences) — the JSON endpoints the page reads.
+  description ids), `cowl_diet_save.ash` (the preferences), `cowl_diet_booze.ash` (the wines and
+  martinis, with the ring's and the shirt's arithmetic) — the JSON endpoints the page reads.
 - `relay/cowl_diet_assets.ash` — what every script needs: addresses for the page's own files, names
   as plain text, and how many of something you own.
 - `data/cowl_diet_limits.txt` — daily limits on consumables.
@@ -246,6 +276,9 @@ switches, tab and days, and the mall's answers for three hours.
 
 - `node tests/cowl_diet.test.js` — the planner against the answers of the Python prototype it was
   ported from, for the same inputs (`testdata/diet/`); the mall stock handling; the rollover counting.
+- `node tests/cowl_diet_booze.test.js` — the wines and martinis tables' formatting and sort: a
+  column of adventures per meat spanning seven orders of magnitude, and a row with no mall price
+  sorting last whichever way the column is turned.
 - `python3 tools/diet_limits.py <KoLmafia source>/src/main/resources/data` — rewrites
   `data/cowl_diet_limits.txt` from KoLmafia's daily limits, which `file_to_map` can't read from inside
   the jar. Re-run it when KoLmafia adds limited consumables.
