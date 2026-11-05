@@ -68,6 +68,29 @@ is('ties break on the name either way', booze.sorted(tied, 'perliver', false).ma
 // The sort never loses or invents a row.
 is('every row survives', booze.sorted(rows, 'permeat', true).length, rows.length);
 
+// --- the line above the table names what is boosting it ----------------------------------------
+//
+// The three boosts are not alike -- two are gear and belong to one of the two tables, the Ode is a
+// song and is on both -- and a reader who has just put the ring on and watched every range move
+// deserves to be told why.
+const says = (boosted, which) => booze.boostLine(boosted, which).replace(/<[^>]*>/g, '');
+
+is('nothing on', says({}, 'wines').includes('Plain figures'), true);
+is('the ring alone', says({ring: true}, 'wines').includes('Adventures include the mafia pinky ring.'), true);
+is('the shirt is not on the wines tab', says({tuxedo: true}, 'wines').includes('Plain figures'), true);
+is('the ring is not on the martinis tab', says({ring: true}, 'martinis').includes('Plain figures'), true);
+// The Ode is on both, and named last, where the sentence ends.
+is('the Ode on the wines tab', says({ode: true}, 'wines').includes('the Ode to Booze, which you would cast first (+1 adventure a point of liver).'), true);
+is('the Ode on the martinis tab', says({ode: true}, 'martinis').includes('the Ode to Booze'), true);
+is('the Ode already up', says({ode: true, odeUp: true}, 'wines').includes('the Ode to Booze (+1 adventure a point of liver).'), true);
+is('all three', says({ring: true, palate: true, ode: true, odeUp: true}, 'wines')
+	.includes('the mafia pinky ring, Refined Palate and the Ode to Booze'), true);
+is('the unboosted line offers the Ode too', says({}, 'martinis').includes('learn the Ode to Booze'), true);
+
+is('one thing, no and', booze.joinAnd(['a']), 'a');
+is('two things', booze.joinAnd(['a', 'b']), 'a and b');
+is('three things', booze.joinAnd(['a', 'b', 'c']), 'a, b and c');
+
 // --- the columns are the ones asked for, in order -----------------------------------------------
 is('the columns', booze.COLUMNS.map(c => c.key).join(','), 'name,liver,range,perliver,price,permeat,owned');
 

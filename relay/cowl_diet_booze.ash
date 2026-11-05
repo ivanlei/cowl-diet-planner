@@ -10,9 +10,10 @@
 //
 // THE FIGURES ARE THE BOOSTED ONES, by the same rule the drinking itself follows: the ring
 // equipped or autoPinkyRing set with the ring to hand, Refined Palate up, the shirt equipped or
-// autoTuxedo set with the shirt to hand. A page that quoted the unboosted number would be quoting
-// adventures nobody is going to get. `boosted` says which of those are in force, so the tab can
-// say so rather than leave a reader wondering why the ranges moved.
+// autoTuxedo set with the shirt to hand, and the Ode to Booze, which is +1 adventure per point of
+// liver on every drink here and the largest of the four. A page that quoted the unboosted number
+// would be quoting adventures nobody is going to get. `boosted` says which of them are in force,
+// so the tab can say so rather than leave a reader wondering why the ranges moved.
 //
 // It reads and nothing else: no request to the mall (historical_price is KoLmafia's record), and
 // nothing is bought, drunk or equipped.
@@ -61,6 +62,24 @@ boolean dietPalate() {
 
 boolean dietWineBoosted()    { return dietPinkyRing() || dietPalate(); }
 boolean dietMartiniBoosted() { return dietTuxedo(); }
+
+// THE ODE TO BOOZE: +1 ADVENTURE PER POINT OF LIVER, on every drink in both tables.
+//
+// mafia's own figure, and a flat one: ConsumablesDatabase's gain for the ode flag is
+// `average + size`, where size is the drink's inebriety. So a 4-liver wine gains 4, deterministic,
+// which shifts both ends of the range and the mean by the same amount -- the martini's kind of
+// bonus rather than the ring's stepped one.
+//
+// THE GATE IS THE SKILL, NOT THE EFFECT, which is a stronger claim than the ring's and is made on
+// purpose: the Diet tab one along plans a cast of it before the drinking and counts its adventures
+// in every drink, so a table here that waited for the effect to be up would disagree with the
+// planner about the same wine. Either way the line above the table says which it is.
+//
+// Nothing has to be excluded. mafia turns the boost off for sushi, which is food, and for the
+// stillsuit's distillate, which is a pseudoitem and so is not in $items[] to be drawn here.
+boolean dietOdeBoosted() {
+	return have_effect($effect[Ode to Booze]) > 0 || have_skill($skill[The Ode to Booze]);
+}
 
 // ROUND HALF TO EVEN, which is what Math.rint does and so what KoLmafia does. Not round(): ASH's
 // rounds halves up, and the bonus is base/8, so every base of 4, 12, 20 is a tie and lands on one.
@@ -117,6 +136,10 @@ string dietAdvRange(item it) {
 		least = least + dietMartiniLeast();
 		most = most + dietMartiniMost();
 	}
+	if (dietOdeBoosted()) {
+		least = least + it.inebriety;
+		most = most + it.inebriety;
+	}
 	return least == most ? least.to_string() : least + "-" + most;
 }
 
@@ -156,6 +179,9 @@ float dietAdvMean(item it) {
 	}
 	if (dietIsMartini(it) && dietMartiniBoosted()) {
 		numerator = numerator + 2 * 100 * rolls;
+	}
+	if (dietOdeBoosted()) {
+		numerator = numerator + it.inebriety * 100 * rolls;   // flat, so it moves the mean by itself
 	}
 	return numerator / (rolls * 100.0);
 }
@@ -314,7 +340,8 @@ void main() {
 	out.append("{\"ok\":true");
 	out.append(",\"boosted\":{\"wine\":" + dietWineBoosted() + ",\"martini\":" + dietMartiniBoosted()
 		+ ",\"ring\":" + dietPinkyRing() + ",\"palate\":" + dietPalate()
-		+ ",\"tuxedo\":" + dietTuxedo() + "}");
+		+ ",\"tuxedo\":" + dietTuxedo() + ",\"ode\":" + dietOdeBoosted()
+		+ ",\"odeUp\":" + (have_effect($effect[Ode to Booze]) > 0) + "}");
 
 	out.append(",\"wines\":[");
 	int n = 0;
