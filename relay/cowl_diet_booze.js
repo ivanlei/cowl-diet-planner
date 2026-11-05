@@ -120,16 +120,30 @@
 		} else if (boosted.tuxedo) {
 			on.push('the tuxedo shirt');
 		}
+		// The Ode is on both tables and is the biggest of the three on anything over a point of
+		// liver, so it is named last, where the sentence ends, rather than in the middle of a list.
+		if (boosted.ode) {
+			on.push('the Ode to Booze' + (boosted.odeUp ? '' : ', which you would cast first') +
+				' (+1 adventure a point of liver)');
+		}
 		var what = which === 'wines' ? 'wine' : 'martini';
 		if (!on.length) {
 			return '<p class="cd-said">Plain figures: nothing is adding adventures to a ' + what +
 				' right now. Put the ' + (which === 'wines' ? 'pinky ring' : 'tuxedo shirt') +
-				' on, or set auto' + (which === 'wines' ? 'PinkyRing' : 'Tuxedo') + ', and these move.</p>';
+				' on, or set auto' + (which === 'wines' ? 'PinkyRing' : 'Tuxedo') +
+				', or learn the Ode to Booze, and these move.</p>';
 		}
-		return '<p class="cd-said">Adventures include ' + esc(on.join(' and ')) +
+		return '<p class="cd-said">Adventures include ' + esc(joinAnd(on)) +
 			'. The average is taken over every roll in the range, which is what KoLmafia does' +
 			(which === 'wines' ? ' — a wine’s average is not the midpoint of its range, because the ring’s' +
 				' bonus is a rounded eighth and so steps.' : '.') + '</p>';
+	}
+
+	// "a and b", "a, b and c". A list of three with one "and" in the middle reads as a list of two,
+	// one of which is a pair.
+	function joinAnd(list) {
+		if (list.length < 2) return list.join('');
+		return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
 	}
 
 	function table(rows, key, down, nameLabel) {
@@ -175,7 +189,7 @@
 			if (wineEl) mountOne(wineEl, data.wines || [], data.boosted || {}, 'wines', 'Wine');
 			if (martiniEl) mountOne(martiniEl, data.martinis || [], data.boosted || {}, 'martinis', 'Martini');
 		},
-		perMeat: perMeat, one: one, sorted: sorted, COLUMNS: COLUMNS
+		perMeat: perMeat, one: one, sorted: sorted, joinAnd: joinAnd, boostLine: boostLine, COLUMNS: COLUMNS
 	};
 	if (typeof module !== 'undefined' && module.exports) module.exports = API;
 	else window.cowlDietBooze = API;

@@ -47,11 +47,20 @@ out, not the meat.
 
 **The figures are the boosted ones**, by the same rule the drinking follows: the ring equipped or
 `autoPinkyRing` set with the ring to hand, Refined Palate up, the shirt equipped or `autoTuxedo` set
-with the shirt to hand. A line above each table says which of those is in force. A wine's average is
-**not** the midpoint of its range — the ring's bonus is a rounded eighth and so steps, and a 9-12
-wine with the ring on rolls 10, 11, 12 or 14, never 13 — so the average is taken over every roll in
-the range, which is what KoLmafia does. A martini's average *is* the midpoint, because the shirt's
-bonus is flat.
+with the shirt to hand, and **the Ode to Booze**, which is worth one more adventure per point of
+liver on every drink in both tables and is the biggest of the four. A line above each table says
+which of them is in force.
+
+The Ode is gated on knowing the skill rather than on the song being up, which is a stronger claim
+than the others make and matches the Diet tab: that tab plans the cast before the drinking and
+counts its adventures inside every drink, so a table here that waited for the song would disagree
+with the planner about the same wine.
+
+A wine's average is **not** the midpoint of its range — the ring's bonus is a rounded eighth and so
+steps, and a 9-12 wine with the ring on rolls 10, 11, 12 or 14, never 13 — so the average is taken
+over every roll in the range, which is what KoLmafia does. A martini's average *is* the midpoint,
+because the shirt's bonus is flat; so is the Ode's, which is why it can be added to both ends of a
+range and to a mean without the two parting company.
 
 Nothing here asks the mall: the price is `historical_price`, KoLmafia's record, because 148 drinks
 drawn on opening a tab is not 148 requests. The Diet tab's **Update prices from the mall** button is
